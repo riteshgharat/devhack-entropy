@@ -11,6 +11,14 @@ import { PixelCard } from './components/PixelCard';
 import { GameArena } from './components/GameArena';
 import { gameClient } from './services/gameClient';
 import { Room } from 'colyseus.js';
+import {
+  AuthScreen,
+  AuthGatePrompt,
+  PlayerProfileBadge,
+  getStoredSession,
+  clearSession,
+  type UserProfile,
+} from './components/AuthScreen';
 
 function App() {
   const [showSettings, setShowSettings] = React.useState(false);
@@ -28,6 +36,12 @@ function App() {
     }
     return id;
   });
+
+  /* ── Auth state ── */
+  const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(() => getStoredSession());
+  const [showAuthGate, setShowAuthGate] = React.useState(false);
+  const [showAuthScreen, setShowAuthScreen] = React.useState(false);
+  const [authInitialTab, setAuthInitialTab] = React.useState<'signin' | 'signup'>('signin');
 
   React.useEffect(() => {
     localStorage.setItem('displayName', displayName);
@@ -60,6 +74,67 @@ function App() {
     gameClient.leave();
     setActiveRoom(null);
     sessionStorage.removeItem('reconnectionToken');
+  };
+
+  /* ── Auth flow: clicked "Start Game" or "Multiplayer" ── */
+  const handlePlayAction = () => {
+    if (currentUser) {
+      setShowMultiplayer(true);
+    } else {
+      setShowAuthGate(true);
+    }
+  };
+
+  /* ── Auth callbacks ── */
+  const handleAuthComplete = (user: UserProfile) => {
+    setCurrentUser(user);
+    setDisplayName(user.username);
+    setCharacterColor(user.avatarColor);
+    setShowAuthScreen(false);
+    setShowAuthGate(false);
+    setTimeout(() => setShowMultiplayer(true), 300);
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setCurrentUser(null);
+  };
+
+  const handleAuthGateSignIn = () => {
+    setShowAuthGate(false);
+    setAuthInitialTab('signin');
+    setShowAuthScreen(true);
+  };
+
+  const handleAuthGateSignUp = () => {
+    setShowAuthGate(false);
+    setAuthInitialTab('signup');
+    setShowAuthScreen(true);
+  };
+
+  const handleAuthGateGuest = () => {
+    setShowAuthGate(false);
+    const guestName = `Guest_${Math.floor(Math.random() * 9000 + 1000)}`;
+    const COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#eab308', '#a855f7', '#f97316', '#ec4899', '#06b6d4'];
+    const guestColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+    const guestProfile: UserProfile = {
+      id: playerId,
+      username: guestName,
+      isGuest: true,
+      avatarColor: guestColor,
+      level: 1,
+      xp: 0,
+      wins: 0,
+      matches: 0,
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem('chaos_arena_session', JSON.stringify(guestProfile));
+    localStorage.setItem('displayName', guestName);
+    localStorage.setItem('playerColor', guestColor);
+    setCurrentUser(guestProfile);
+    setDisplayName(guestName);
+    setCharacterColor(guestColor);
+    setTimeout(() => setShowMultiplayer(true), 300);
   };
 
   if (showSplash) {
@@ -135,6 +210,15 @@ function App() {
             {nightMode ? '🌙 Night' : '☀️ Day'}
           </motion.div>
 
+          {/* ═══ Player Profile Badge (top-right) ═══ */}
+          {currentUser && (
+            <PlayerProfileBadge
+              user={currentUser}
+              nightMode={nightMode}
+              onLogout={handleLogout}
+            />
+          )}
+
           {/* Header / Logo */}
           <header className="relative z-10 pt-12 pb-6 text-center">
             <motion.h1
@@ -179,7 +263,7 @@ function App() {
                 <PixelButton
                   size="lg"
                   className="w-64 text-xl tracking-widest animate-pulse"
-                  onClick={() => setShowMultiplayer(true)}
+                  onClick={handlePlayAction}
                 >
                   Start Game
                 </PixelButton>
@@ -188,7 +272,7 @@ function App() {
                   variant="secondary"
                   size="md"
                   className="w-64"
-                  onClick={() => setShowMultiplayer(true)}
+                  onClick={handlePlayAction}
                 >
                   Multiplayer
                 </PixelButton>
@@ -201,6 +285,24 @@ function App() {
                 >
                   Settings
                 </PixelButton>
+
+                {/* Sign In / Sign Up button if not logged in */}
+                {!currentUser && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                  >
+                    <PixelButton
+                      variant="secondary"
+                      size="sm"
+                      className="w-64"
+                      onClick={() => { setAuthInitialTab('signin'); setShowAuthScreen(true); }}
+                    >
+                      🔑 Sign In / Sign Up
+                    </PixelButton>
+                  </motion.div>
+                )}
               </div>
 
               {/* Right: Player Stats */}
@@ -228,6 +330,31 @@ function App() {
             displayName={displayName}
             onClose={() => setShowMultiplayer(false)}
             onJoin={handleJoinRoom}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ═══ Auth Gate Prompt ("You're not logged in!") ═══ */}
+      <AnimatePresence>
+        {showAuthGate && (
+          <AuthGatePrompt
+            nightMode={nightMode}
+            onSignIn={handleAuthGateSignIn}
+            onSignUp={handleAuthGateSignUp}
+            onGuest={handleAuthGateGuest}
+            onClose={() => setShowAuthGate(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ═══ Full Auth Screen (Sign In / Sign Up) ═══ */}
+      <AnimatePresence>
+        {showAuthScreen && (
+          <AuthScreen
+            nightMode={nightMode}
+            onAuth={handleAuthComplete}
+            onClose={() => setShowAuthScreen(false)}
+            initialTab={authInitialTab}
           />
         )}
       </AnimatePresence>

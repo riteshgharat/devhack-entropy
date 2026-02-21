@@ -4,8 +4,8 @@
 export const TICK_RATE = 60;
 
 /** Arena dimensions (world units) */
-export const ARENA_WIDTH = 800;
-export const ARENA_HEIGHT = 600;
+export const ARENA_WIDTH = 768;
+export const ARENA_HEIGHT = 512;
 
 /** Player limits per room */
 export const MAX_PLAYERS = 8;
@@ -26,6 +26,6 @@ export const MATCH_RESET_DELAY = 5000;
 
 /** Grass Collection Game Constants */
 export const MATCH_DURATION = 60; // seconds
-export const GRASS_COUNT = 50; // total grass to spawn
-export const GRASS_RADIUS = 15;
-export const PLAYER_RADIUS = 15;
+export const GRASS_COUNT = 96; // 12x8 grid
+export const GRASS_RADIUS = 24;
+export const PLAYER_RADIUS = 30;

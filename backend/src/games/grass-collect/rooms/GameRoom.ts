@@ -14,27 +14,40 @@ import {
   MATCH_RESET_DELAY,
   TICK_RATE,
   MATCH_DURATION,
-  GRASS_COUNT,
   GRASS_RADIUS,
   PLAYER_RADIUS,
 } from "../utils/constants";
 import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
 
-// ─── Message types from the client ───────────────────────
 interface MoveInput {
-  dx: number; // -1, 0, or 1
-  dy: number; // -1, 0, or 1
+  dx: number;
+  dy: number;
 }
 
-interface JoinOptions {
-  displayName?: string;
-}
+const TILE_SIZE = 64;
+const COLS = 12;
+const ROWS = 8;
+
+// Corner spawn positions (offset from corners by SPAWN_MARGIN)
+const CORNER_SPAWNS = [
+  { x: SPAWN_MARGIN, y: SPAWN_MARGIN },                                       // top-left
+  { x: ARENA_WIDTH - SPAWN_MARGIN, y: SPAWN_MARGIN },                         // top-right
+  { x: SPAWN_MARGIN, y: ARENA_HEIGHT - SPAWN_MARGIN },                        // bottom-left
+  { x: ARENA_WIDTH - SPAWN_MARGIN, y: ARENA_HEIGHT - SPAWN_MARGIN },          // bottom-right
+  { x: ARENA_WIDTH / 2, y: SPAWN_MARGIN },                                    // top-center
+  { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT - SPAWN_MARGIN },                     // bottom-center
+  { x: SPAWN_MARGIN, y: ARENA_HEIGHT / 2 },                                   // left-center
+  { x: ARENA_WIDTH - SPAWN_MARGIN, y: ARENA_HEIGHT / 2 },                     // right-center
+];
+
+// Power-up counts
+const BOMB_COUNT = 5;
+const ROCKET_COUNT = 5;
+const SPEED_COUNT = 5;
 
 export class GameRoom extends Room<GameState> {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private resetTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  // ───── Room lifecycle ────────────────────────────────────
 
   async onCreate(options: any) {
     if (options.customRoomId) {
@@ -43,29 +56,28 @@ export class GameRoom extends Room<GameState> {
     this.state = new GameState();
     this.maxClients = MAX_PLAYERS;
 
-    // Set arena boundaries on state
     this.state.arenaBoundaryX = ARENA_WIDTH;
     this.state.arenaBoundaryY = ARENA_HEIGHT;
 
-    // Register message handlers
     this.onMessage("move", (client: Client, data: MoveInput) => {
       this.handleMove(client, data);
     });
 
-    // Set up the authoritative simulation loop
     this.setSimulationInterval((deltaTime: number) => {
       this.update(deltaTime);
     }, 1000 / TICK_RATE);
 
-    console.log(`���️  GameRoom created | Room ID: ${this.roomId}`);
+    console.log(`🏟️  GameRoom created | Room ID: ${this.roomId}`);
   }
 
   onJoin(client: Client, options: any) {
     const player = new PlayerState();
 
-    // Random spawn position within safe margin
-    player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-    player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+    // Spawn at corners
+    const spawnIndex = this.state.players.size % CORNER_SPAWNS.length;
+    const spawn = CORNER_SPAWNS[spawnIndex];
+    player.x = spawn.x;
+    player.y = spawn.y;
     player.score = 0;
     player.displayName =
       options?.displayName || `Player_${client.sessionId.slice(0, 4)}`;
@@ -78,11 +90,10 @@ export class GameRoom extends Room<GameState> {
 
     console.log(
       `✅ ${player.displayName} joined | ` +
-        `Session: ${client.sessionId} | ` +
-        `Players: ${this.state.players.size}/${MAX_PLAYERS}`
+      `Session: ${client.sessionId} | ` +
+      `Players: ${this.state.players.size}/${MAX_PLAYERS}`
     );
 
-    // Start countdown if we have enough players
     this.tryStartCountdown();
   }
 
@@ -106,15 +117,13 @@ export class GameRoom extends Room<GameState> {
   onDispose() {
     if (this.countdownInterval) clearInterval(this.countdownInterval);
     if (this.resetTimeout) clearTimeout(this.resetTimeout);
-    console.log(`���️  GameRoom disposed | Room ID: ${this.roomId}`);
+    console.log(`🗑️  GameRoom disposed | Room ID: ${this.roomId}`);
   }
-
-  // ───── Message handlers ──────────────────────────────────
 
   private handleMove(client: Client, data: MoveInput) {
     const player = this.state.players.get(client.sessionId);
     if (!player || !this.state.matchStarted || this.state.matchEnded) return;
-    if (player.stunTimer > 0) return; // Cannot move while stunned
+    if (player.stunTimer > 0) return;
 
     const dx = Math.sign(data.dx || 0);
     const dy = Math.sign(data.dy || 0);
@@ -123,14 +132,11 @@ export class GameRoom extends Room<GameState> {
     player.velocityY = dy * PLAYER_SPEED * player.speedMultiplier;
   }
 
-  // ───── Simulation tick ───────────────────────────────────
-
   private update(deltaTime: number) {
-    const dt = deltaTime / 1000; // ms → seconds
+    const dt = deltaTime / 1000;
 
     if (!this.state.matchStarted || this.state.matchEnded) return;
 
-    // Update match timer
     this.state.matchTimer -= dt;
     if (this.state.matchTimer <= 0) {
       this.state.matchTimer = 0;
@@ -138,9 +144,7 @@ export class GameRoom extends Room<GameState> {
       return;
     }
 
-    // ── Process players ──
     this.state.players.forEach((player: PlayerState, sessionId: string) => {
-      // Update timers
       if (player.stunTimer > 0) {
         player.stunTimer -= dt;
         if (player.stunTimer <= 0) {
@@ -149,14 +153,12 @@ export class GameRoom extends Room<GameState> {
       }
 
       if (player.stunTimer <= 0) {
-        // Apply velocity to position
         player.x += player.velocityX * dt;
         player.y += player.velocityY * dt;
 
-        // Clamp velocity magnitude
         const speed = Math.sqrt(
           player.velocityX * player.velocityX +
-            player.velocityY * player.velocityY
+          player.velocityY * player.velocityY
         );
         if (speed > MAX_VELOCITY * player.speedMultiplier) {
           const scale = (MAX_VELOCITY * player.speedMultiplier) / speed;
@@ -164,66 +166,81 @@ export class GameRoom extends Room<GameState> {
           player.velocityY *= scale;
         }
 
-        // Friction
         player.velocityX *= 0.9;
         player.velocityY *= 0.9;
         if (Math.abs(player.velocityX) < 1) player.velocityX = 0;
         if (Math.abs(player.velocityY) < 1) player.velocityY = 0;
 
-        // Clamp position to arena
-        player.x = Math.max(0, Math.min(this.state.arenaBoundaryX, player.x));
-        player.y = Math.max(0, Math.min(this.state.arenaBoundaryY, player.y));
+        player.x = Math.max(PLAYER_RADIUS, Math.min(this.state.arenaBoundaryX - PLAYER_RADIUS, player.x));
+        player.y = Math.max(PLAYER_RADIUS, Math.min(this.state.arenaBoundaryY - PLAYER_RADIUS, player.y));
       }
 
-      // ── Check Grass Collection ──
+      // ── TWO-PHASE GRASS COLLECTION ──
       for (let i = this.state.grasses.length - 1; i >= 0; i--) {
         const grass = this.state.grasses[i];
         const dx = player.x - grass.x;
         const dy = player.y - grass.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist < PLAYER_RADIUS + GRASS_RADIUS) {
-          // Collected!
-          player.score += 1;
-          this.state.grasses.splice(i, 1);
-          this.handlePowerup(sessionId, player);
+        const collisionDist = PLAYER_RADIUS + (grass.phase === 1 ? GRASS_RADIUS : GRASS_RADIUS * 0.6);
+
+        if (dist < collisionDist) {
+          if (grass.phase === 1) {
+            // Phase 1 → Phase 2: Big grass becomes small grass
+            player.score += 1;
+            grass.phase = 2;
+            // Broadcast that a big grass was collected
+            this.broadcast("grass_collected", {
+              id: grass.id,
+              x: grass.x,
+              y: grass.y,
+              playerId: sessionId,
+            });
+          } else if (grass.phase === 2) {
+            // Phase 2: Small grass collected → remove it
+            const powerUp = grass.powerUp;
+            this.state.grasses.splice(i, 1);
+
+            if (powerUp === "bomb") {
+              player.stunTimer = 3;
+              this.state.lastEvent = `${player.displayName} stepped on a Bomb!`;
+            } else if (powerUp === "rocket") {
+              this.state.lastEvent = `${player.displayName} launched a Rocket!`;
+              this.state.players.forEach((p, id) => {
+                if (id !== sessionId) {
+                  p.stunTimer = 3;
+                }
+              });
+            } else if (powerUp === "speed") {
+              player.speedMultiplier = 2;
+              this.state.lastEvent = `${player.displayName} found a Speed Booster!`;
+              setTimeout(() => {
+                if (this.state.players.has(sessionId)) {
+                  this.state.players.get(sessionId)!.speedMultiplier = 1;
+                }
+              }, 5000);
+            }
+            // No powerUp = just a normal small grass, score +1
+            player.score += 1;
+
+            this.broadcast("small_grass_collected", {
+              id: grass.id,
+              x: grass.x,
+              y: grass.y,
+              powerUp,
+              playerId: sessionId,
+            });
+          }
+          break; // Only collect ONE grass per tick per player
         }
       }
     });
 
-    // Check if all grass collected
+    // Check if all grass collected (both phases)
     if (this.state.grasses.length === 0) {
       this.endMatch();
     }
   }
-
-  private handlePowerup(collectorId: string, player: PlayerState) {
-    const rand = Math.random();
-    if (rand < 0.05) {
-      // 5% chance: Speed Booster
-      player.speedMultiplier = 2;
-      this.state.lastEvent = `${player.displayName} found a Speed Booster!`;
-      setTimeout(() => {
-        if (this.state.players.has(collectorId)) {
-          this.state.players.get(collectorId)!.speedMultiplier = 1;
-        }
-      }, 5000);
-    } else if (rand < 0.10) {
-      // 5% chance: Bomb (stun self)
-      player.stunTimer = 3;
-      this.state.lastEvent = `${player.displayName} stepped on a Bomb!`;
-    } else if (rand < 0.12) {
-      // 2% chance: Rocket (stun others)
-      this.state.lastEvent = `${player.displayName} launched a Rocket!`;
-      this.state.players.forEach((p, id) => {
-        if (id !== collectorId) {
-          p.stunTimer = 3;
-        }
-      });
-    }
-  }
-
-  // ───── Game logic helpers ────────────────────────────────
 
   private tryStartCountdown() {
     if (this.state.matchStarted || this.countdownInterval) return;
@@ -253,33 +270,66 @@ export class GameRoom extends Room<GameState> {
     this.state.winnerId = "";
     this.state.lastEvent = "Match Started!";
 
-    // Reset arena boundaries
     this.state.arenaBoundaryX = ARENA_WIDTH;
     this.state.arenaBoundaryY = ARENA_HEIGHT;
 
-    // Spawn Grass
+    // Clear existing
     while (this.state.grasses.length > 0) {
       this.state.grasses.pop();
     }
-    for (let i = 0; i < GRASS_COUNT; i++) {
-      const grass = new GrassState();
-      grass.id = `grass_${i}`;
-      grass.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      grass.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
-      this.state.grasses.push(grass);
+
+    // Build grass grid (12x8 = 96 tiles)
+    const allPositions: { row: number; col: number }[] = [];
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        allPositions.push({ row, col });
+      }
     }
 
+    // Randomly assign power-ups to 15 of the 96 tiles
+    const shuffled = [...allPositions].sort(() => Math.random() - 0.5);
+    const powerUpMap = new Map<string, string>();
+    for (let i = 0; i < BOMB_COUNT; i++) {
+      const pos = shuffled[i];
+      powerUpMap.set(`${pos.row}_${pos.col}`, "bomb");
+    }
+    for (let i = BOMB_COUNT; i < BOMB_COUNT + ROCKET_COUNT; i++) {
+      const pos = shuffled[i];
+      powerUpMap.set(`${pos.row}_${pos.col}`, "rocket");
+    }
+    for (let i = BOMB_COUNT + ROCKET_COUNT; i < BOMB_COUNT + ROCKET_COUNT + SPEED_COUNT; i++) {
+      const pos = shuffled[i];
+      powerUpMap.set(`${pos.row}_${pos.col}`, "speed");
+    }
+
+    // Create all 96 grass tiles as phase 1 (big) with hidden power-ups
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const grass = new GrassState();
+        grass.id = `grass_${row}_${col}`;
+        grass.x = col * TILE_SIZE + TILE_SIZE / 2;
+        grass.y = row * TILE_SIZE + TILE_SIZE / 2;
+        grass.phase = 1;
+        grass.powerUp = powerUpMap.get(`${row}_${col}`) || "";
+        this.state.grasses.push(grass);
+      }
+    }
+
+    // Spawn players at corners
+    let spawnIdx = 0;
     this.state.players.forEach((player: PlayerState) => {
       player.score = 0;
       player.speedMultiplier = 1;
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
-      player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+      const spawn = CORNER_SPAWNS[spawnIdx % CORNER_SPAWNS.length];
+      player.x = spawn.x;
+      player.y = spawn.y;
+      spawnIdx++;
     });
 
-    console.log(`��� Match started! ${this.state.players.size} players in the arena.`);
+    console.log(`🎮 Match started! ${this.state.players.size} players, ${this.state.grasses.length} grass tiles.`);
     this.broadcast("match_start", { playerCount: this.state.players.size });
   }
 
@@ -311,8 +361,8 @@ export class GameRoom extends Room<GameState> {
 
     console.log(
       isDraw
-        ? `��� Draw — multiple players tied with ${maxScore} grass!`
-        : `��� ${winnerName} wins with ${maxScore} grass!`
+        ? `🏆 Draw — tied at ${maxScore}!`
+        : `🏆 ${winnerName} wins with ${maxScore}!`
     );
 
     this.broadcast("match_end", {
@@ -334,7 +384,6 @@ export class GameRoom extends Room<GameState> {
 
     savePlayerStats(playerStatsToSave).catch((err) => console.warn(`⚠️  Failed to save player stats: ${err.message}`));
 
-    // Persist match result to database (async, non-blocking)
     saveMatchResult({
       roomId: this.roomId,
       winnerId,
@@ -344,13 +393,11 @@ export class GameRoom extends Room<GameState> {
       isDraw,
     }).catch((err) => console.warn(`⚠️  Failed to save match: ${err.message}`));
 
-    // Auto-reset room after delay
     this.resetTimeout = setTimeout(() => {
       this.resetMatch();
     }, MATCH_RESET_DELAY);
   }
 
-  /** Reset the room for a new match */
   private resetMatch() {
     this.state.matchStarted = false;
     this.state.matchEnded = false;
@@ -359,25 +406,26 @@ export class GameRoom extends Room<GameState> {
     this.state.countdown = 0;
     this.state.lastEvent = "";
 
-    // Clear grass
     while (this.state.grasses.length > 0) {
       this.state.grasses.pop();
     }
 
+    let spawnIdx = 0;
     this.state.players.forEach((player: PlayerState) => {
       player.score = 0;
       player.speedMultiplier = 1;
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
-      player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+      const spawn = CORNER_SPAWNS[spawnIdx % CORNER_SPAWNS.length];
+      player.x = spawn.x;
+      player.y = spawn.y;
+      spawnIdx++;
     });
 
-    console.log(`��� Room reset. ${this.state.players.size} players ready.`);
+    console.log(`🔄 Room reset. ${this.state.players.size} players ready.`);
     this.broadcast("match_reset", { playerCount: this.state.players.size });
 
-    // Start new countdown if enough players
     this.tryStartCountdown();
   }
 }

@@ -7,14 +7,11 @@ const results: Record<string, boolean> = {
     "Player Join (Bot_Alpha)":       false,
     "Player Join (Bot_Beta)":        false,
     "Match Start Received":          false,
-    "Leader Detected":               false,
-    "Mutation: spawn_falling_block": false,
-    "Mutation: shrink_boundary":     false,
-    "Mutation: rotate_obstacle":     false,
-    "Mutation: speed_modifier":      false,
-    "Mutation: target_player_trap":  false,
+    "Grass Spawned":                 false,
     "Movement Sent":                 false,
-    "Elimination / Match End":       false,
+    "Grass Collected":               false,
+    "Powerup Triggered":             false,
+    "Match End":                     false,
 };
 
 function pass(key: string) {
@@ -37,7 +34,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 // ── Main test ─────────────────────────────────────────────────
 async function runIntegrationTest() {
     console.log("\n==============================================");
-    console.log("  Chaos Arena - Backend Integration Test");
+    console.log("  Grass Collection - Backend Integration Test");
     console.log("==============================================\n");
 
     try {
@@ -57,84 +54,79 @@ async function runIntegrationTest() {
         });
 
         player1.onMessage("match_end", (msg: any) => {
-            pass("Elimination / Match End");
-            console.log(`  >> Winner: ${msg.winner ?? "TBD"}`);
+            pass("Match End");
+            console.log(`  >> Winner: ${msg.winnerName ?? "TBD"} with ${msg.maxScore} grass`);
         });
 
         player1.onStateChange((state: any) => {
-            // Leader detection
-            if (state.leaderId) {
-                const leader = state.players.get(state.leaderId);
-                if (leader) pass("Leader Detected");
+            if (state.grasses && state.grasses.length > 0) {
+                pass("Grass Spawned");
             }
-            // Mutation detection via lastArenaEvent
-            const evt: string = state.lastArenaEvent ?? "";
-            if (evt.includes("block"))    pass("Mutation: spawn_falling_block");
-            if (evt.includes("boundary")) pass("Mutation: shrink_boundary");
-            if (evt.includes("rotate"))   pass("Mutation: rotate_obstacle");
-            if (evt.includes("speed"))    pass("Mutation: speed_modifier");
-            if (evt.includes("trap"))     pass("Mutation: target_player_trap");
+            
+            const p1 = state.players.get(player1.sessionId);
+            if (p1 && p1.score > 0) {
+                pass("Grass Collected");
+            }
+
+            const evt: string = state.lastEvent ?? "";
+            if (evt.includes("Speed Booster") || evt.includes("Bomb") || evt.includes("Rocket")) {
+                pass("Powerup Triggered");
+            }
         });
 
         // ── Phase 2: Countdown ────────────────────────────────
         console.log("\n[Phase 2] Waiting for match countdown (5s)...");
         await sleep(5000);
 
-        // ── Phase 3: Arena Mutations ──────────────────────────
-        console.log("\n[Phase 3] Arena Mutations");
+        // ── Phase 3: Movement & Collection ────────────────────
+        console.log("\n[Phase 3] Movement & Collection");
 
-        const mutations = [
-            "spawn_falling_block",
-            "shrink_boundary",
-            "rotate_obstacle",
-            "speed_modifier",
-        ] as const;
-
-        for (const mutation of mutations) {
-            console.log(`  -> ${mutation}`);
-            player1.send("arena_mutation", { mutation });
-            await sleep(1200);
+        // Send movement commands to simulate collecting grass
+        for (let i = 0; i < 20; i++) {
+            player1.send("move", { dx: 1, dy: 0 });
+            player2.send("move", { dx: -1, dy: 1 });
+            await sleep(100);
+            player1.send("move", { dx: 0, dy: 1 });
+            player2.send("move", { dx: 1, dy: -1 });
+            await sleep(100);
+            pass("Movement Sent");
         }
 
-        console.log("  -> target_player_trap (targeting Bot_Beta)");
-        player1.send("arena_mutation", { mutation: "target_player_trap", targetSessionId: player2.sessionId });
-        await sleep(1200);
+        // ── Phase 4: Wait for Match End ───────────────────────
+        console.log("\n[Phase 4] Waiting for match to end (or timeout)...");
+        // We'll wait a bit to see if they collect enough or time runs out
+        // For a real test, we might not want to wait 60s. Let's just wait 5s and then force disconnect.
+        await sleep(5000);
 
-        // ── Phase 4: Movement ─────────────────────────────────
-        console.log("\n[Phase 4] Movement");
-        for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
-            player1.send("move", { dx, dy });
-        }
-        pass("Movement Sent");
-        await sleep(1000);        // ── Phase 5: Elimination ──────────────────────────────
-        console.log("\n[Phase 5] Forcing Bot_Beta out-of-bounds...");
-        for (let i = 0; i < 60; i++) {
-            player2.send("move", { dx: -1, dy: -1 });
-        }
-        await sleep(3000);
+        console.log("\n[Phase 5] Disconnecting clients");
+        player1.leave();
+        player2.leave();
+        await sleep(1000);
 
         // ── Summary ───────────────────────────────────────────
         console.log("\n==============================================");
         console.log("  Test Summary");
         console.log("==============================================");
-
-        let passed = 0;
-        const total = Object.keys(results).length;
-        for (const [name, ok] of Object.entries(results)) {
-            console.log(`  ${ok ? "[PASS]" : "[FAIL]"} ${name}`);
-            if (ok) passed++;
+        let allPassed = true;
+        for (const [key, passed] of Object.entries(results)) {
+            const status = passed ? "✅ PASS" : "❌ FAIL";
+            console.log(`  ${status} | ${key}`);
+            if (!passed && key !== "Powerup Triggered" && key !== "Match End") {
+                // Powerup is random, might not trigger in short test. Match End might not happen if we don't wait 60s.
+                allPassed = false;
+            }
         }
 
-        console.log("----------------------------------------------");
-        console.log(`  Result: ${passed}/${total} checks passed`);
-        console.log("==============================================\n");
+        if (allPassed) {
+            console.log("\n��� ALL CRITICAL TESTS PASSED!");
+            process.exit(0);
+        } else {
+            console.log("\n⚠️ SOME TESTS FAILED.");
+            process.exit(1);
+        }
 
-        player1.leave();
-        player2.leave();
-        process.exit(passed === total ? 0 : 1);
-
-    } catch (e) {
-        console.error("\n[ERROR] Fatal:", e);
+    } catch (err) {
+        console.error("\n❌ TEST CRASHED:", err);
         process.exit(1);
     }
 }

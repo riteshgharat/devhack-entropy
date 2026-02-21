@@ -2,16 +2,19 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { Server } from "colyseus";
-import { GameRoom } from "./rooms/GameRoom";
+import { GameRoom } from "./games/grass-collect/rooms/GameRoom";
 import { initRedis } from "./db/redis";
 import { initSQLite } from "./db/sqlite";
 import { getRecentMatches } from "./db/matchHistory";
+
+import cors from "cors";
 
 const PORT = Number(process.env.PORT) || 3000;
 
 // ─── Colyseus game server ─────────────────────────────────
 const gameServer = new Server({
   express: (app) => {
+    app.use(cors());
     // Health check
     app.get("/health", (_req, res) => {
       res.json({

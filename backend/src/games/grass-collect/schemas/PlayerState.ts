@@ -13,11 +13,14 @@ export class PlayerState extends Schema {
   /** Vertical velocity */
   @type("float32") velocityY: number = 0;
 
-  /** Whether this player is still in the match */
-  @type("boolean") isAlive: boolean = true;
+  /** Grass collected */
+  @type("uint16") score: number = 0;
 
-  /** Seconds survived in the current match */
-  @type("float32") survivalTime: number = 0;
+  /** Speed multiplier (e.g., from speed booster) */
+  @type("float32") speedMultiplier: number = 1;
+
+  /** Time left for stun effect (e.g., from bomb or rocket) */
+  @type("float32") stunTimer: number = 0;
 
   /** Display name shown in-game */
   @type("string") displayName: string = "";

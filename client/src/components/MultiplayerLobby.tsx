@@ -15,7 +15,9 @@ import {
     Crown,
     Swords,
     ArrowLeft,
+    Loader2,
 } from 'lucide-react';
+import { gameClient } from '../services/gameClient';
 
 /* ── Fake friends data ── */
 const ONLINE_FRIENDS = [
@@ -70,15 +72,43 @@ type LobbyTab = 'friends' | 'join' | 'create' | 'quick';
 interface MultiplayerLobbyProps {
     nightMode?: boolean;
     onClose: () => void;
+    onJoin: (room: any) => void;
 }
 
-export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, onClose }) => {
+export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, onClose, onJoin }) => {
     const [activeTab, setActiveTab] = useState<LobbyTab>('friends');
     const [inviteCode, setInviteCode] = useState('');
     const [generatedCode, setGeneratedCode] = useState('');
     const [copied, setCopied] = useState(false);
     const [searching, setSearching] = useState(false);
     const [searchDots, setSearchDots] = useState('');
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleJoinOrCreate = async (mode: 'join' | 'create' | 'quick', code?: string) => {
+        setIsConnecting(true);
+        setError(null);
+        try {
+            const displayName = localStorage.getItem('displayName') || `Player_${Math.floor(Math.random() * 1000)}`;
+            let room;
+            if (mode === 'create') {
+                room = await gameClient.joinOrCreate("arena_room", { displayName });
+            } else if (mode === 'join' && code) {
+                room = await gameClient.join(code, { displayName });
+            } else if (mode === 'quick') {
+                room = await gameClient.joinOrCreate("arena_room", { displayName });
+            }
+
+            if (room) {
+                onJoin(room);
+            }
+        } catch (err: any) {
+            setError(err.message || "Failed to connect to game server");
+            setSearching(false);
+        } finally {
+            setIsConnecting(false);
+        }
+    };
 
     // Generate a random invite code
     const generateCode = () => {
@@ -128,8 +158,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                     <button
                         onClick={onClose}
                         className={`absolute top-2 right-2 p-1 border-2 transition-colors z-10 ${nightMode
-                                ? 'border-slate-600 text-slate-400 hover:bg-slate-700'
-                                : 'border-slate-300 text-slate-500 hover:bg-slate-100'
+                            ? 'border-slate-600 text-slate-400 hover:bg-slate-700'
+                            : 'border-slate-300 text-slate-500 hover:bg-slate-100'
                             }`}
                     >
                         <X size={14} />
@@ -173,8 +203,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     <motion.div
                                         key={friend.id}
                                         className={`flex items-center gap-3 p-2 border-2 transition-colors cursor-pointer ${nightMode
-                                                ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                                                : 'bg-slate-50 border-slate-200 hover:bg-white'
+                                            ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
+                                            : 'bg-slate-50 border-slate-200 hover:bg-white'
                                             }`}
                                         whileHover={{ x: 4 }}
                                     >
@@ -188,8 +218,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                             </div>
                                         </div>
                                         <div className={`px-2 py-0.5 border text-[8px] font-display uppercase ${friend.status === 'online'
-                                                ? 'bg-green-100 border-green-400 text-green-700'
-                                                : 'bg-yellow-100 border-yellow-400 text-yellow-700'
+                                            ? 'bg-green-100 border-green-400 text-green-700'
+                                            : 'bg-yellow-100 border-yellow-400 text-yellow-700'
                                             }`}>
                                             {friend.status === 'online' ? 'ONLINE' : 'IN GAME'}
                                         </div>
@@ -212,8 +242,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     <div
                                         key={friend.id}
                                         className={`flex items-center gap-3 p-2 border-2 opacity-50 ${nightMode
-                                                ? 'bg-slate-800 border-slate-700'
-                                                : 'bg-slate-100 border-slate-200'
+                                            ? 'bg-slate-800 border-slate-700'
+                                            : 'bg-slate-100 border-slate-200'
                                             }`}
                                     >
                                         <MiniStickman color="#6b7280" size={24} />
@@ -226,8 +256,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                             </div>
                                         </div>
                                         <div className={`px-2 py-0.5 border text-[8px] font-display uppercase ${nightMode
-                                                ? 'bg-slate-700 border-slate-600 text-slate-500'
-                                                : 'bg-slate-200 border-slate-300 text-slate-400'
+                                            ? 'bg-slate-700 border-slate-600 text-slate-500'
+                                            : 'bg-slate-200 border-slate-300 text-slate-400'
                                             }`}>
                                             OFFLINE
                                         </div>
@@ -264,8 +294,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                         value={inviteCode}
                                         onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
                                         className={`flex-1 px-4 py-3 border-4 font-display text-xl uppercase tracking-[0.5em] text-center outline-none transition-colors ${nightMode
-                                                ? 'bg-slate-700 border-slate-500 text-white placeholder-slate-600 focus:border-indigo-400'
-                                                : 'bg-white border-slate-300 text-slate-800 placeholder-slate-300 focus:border-blue-400'
+                                            ? 'bg-slate-700 border-slate-500 text-white placeholder-slate-600 focus:border-indigo-400'
+                                            : 'bg-white border-slate-300 text-slate-800 placeholder-slate-300 focus:border-blue-400'
                                             }`}
                                     />
                                 </div>
@@ -274,11 +304,22 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     variant="primary"
                                     size="lg"
                                     className="w-full text-sm"
-                                    onClick={() => alert(`Joining room: ${inviteCode}`)}
+                                    onClick={() => handleJoinOrCreate('join', inviteCode)}
+                                    disabled={isConnecting || inviteCode.length < 3}
                                 >
-                                    <DoorOpen size={16} className="inline mr-2" />
+                                    {isConnecting ? (
+                                        <Loader2 size={16} className="inline mr-2 animate-spin" />
+                                    ) : (
+                                        <DoorOpen size={16} className="inline mr-2" />
+                                    )}
                                     Join Room
                                 </PixelButton>
+
+                                {error && (
+                                    <p className="text-red-500 text-[10px] text-center font-display uppercase">
+                                        {error}
+                                    </p>
+                                )}
                             </motion.div>
                         )}
 
@@ -320,8 +361,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     >
                                         {/* Generated code display */}
                                         <div className={`relative py-4 border-4 text-center ${nightMode
-                                                ? 'bg-slate-700 border-indigo-500'
-                                                : 'bg-slate-50 border-blue-400'
+                                            ? 'bg-slate-700 border-indigo-500'
+                                            : 'bg-slate-50 border-blue-400'
                                             }`}>
                                             <p className={`font-display text-3xl tracking-[0.6em] ${nightMode ? 'text-indigo-300' : 'text-blue-600'
                                                 }`}>
@@ -346,11 +387,23 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                                 variant="primary"
                                                 size="md"
                                                 className="flex-1 text-xs"
-                                                onClick={() => alert(`Room ${generatedCode} created! Waiting for players...`)}
+                                                onClick={() => handleJoinOrCreate('create')}
+                                                disabled={isConnecting}
                                             >
+                                                {isConnecting ? (
+                                                    <Loader2 size={14} className="inline mr-1 animate-spin" />
+                                                ) : (
+                                                    <Zap size={14} className="inline mr-1" />
+                                                )}
                                                 Start Room
                                             </PixelButton>
                                         </div>
+
+                                        {error && (
+                                            <p className="text-red-500 text-[10px] text-center font-display uppercase">
+                                                {error}
+                                            </p>
+                                        )}
 
                                         <button
                                             onClick={generateCode}
@@ -389,9 +442,18 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                         variant="danger"
                                         size="lg"
                                         className="w-full text-sm animate-pulse"
-                                        onClick={() => setSearching(true)}
+                                        onClick={() => {
+                                            setSearching(true);
+                                            // Simulate search then join
+                                            setTimeout(() => handleJoinOrCreate('quick'), 2000);
+                                        }}
+                                        disabled={isConnecting}
                                     >
-                                        <Zap size={16} className="inline mr-2" />
+                                        {isConnecting ? (
+                                            <Loader2 size={16} className="inline mr-2 animate-spin" />
+                                        ) : (
+                                            <Zap size={16} className="inline mr-2" />
+                                        )}
                                         Find Match
                                     </PixelButton>
                                 ) : (
@@ -446,20 +508,20 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     </p>
                                     <div className="flex gap-2">
                                         <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
-                                                ? 'border-indigo-500 bg-indigo-900/50 text-indigo-300'
-                                                : 'border-blue-400 bg-blue-100 text-blue-700'
+                                            ? 'border-indigo-500 bg-indigo-900/50 text-indigo-300'
+                                            : 'border-blue-400 bg-blue-100 text-blue-700'
                                             }`}>
                                             1v1
                                         </button>
                                         <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
-                                                ? 'border-slate-600 bg-slate-700 text-slate-400'
-                                                : 'border-slate-300 bg-white text-slate-500'
+                                            ? 'border-slate-600 bg-slate-700 text-slate-400'
+                                            : 'border-slate-300 bg-white text-slate-500'
                                             }`}>
                                             2v2
                                         </button>
                                         <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
-                                                ? 'border-slate-600 bg-slate-700 text-slate-400'
-                                                : 'border-slate-300 bg-white text-slate-500'
+                                            ? 'border-slate-600 bg-slate-700 text-slate-400'
+                                            : 'border-slate-300 bg-white text-slate-500'
                                             }`}>
                                             FFA
                                         </button>

@@ -1,0 +1,93 @@
+{
+  "info": {
+    "name": "Chaos Arena Backend Testing",
+    "_postman_id": "chaos-arena-backend-collection",
+    "description": "Postman collection to test Chaos Arena backend (HTTP + WebSocket)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "wsUrl",
+      "value": "ws://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "1️⃣ Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response contains required fields\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('name');",
+              "    pm.expect(jsonData).to.have.property('status');",
+              "    pm.expect(jsonData).to.have.property('version');",
+              "});",
+              "",
+              "pm.test(\"Server status is running\", function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.status).to.eql(\"running\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2️⃣ WebSocket Connection Test",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{wsUrl}}",
+          "protocol": "ws",
+          "host": ["localhost"],
+          "port": "3000"
+        }
+      },
+      "description": "Use Postman WebSocket Request to connect manually.\nExpected: Successful WebSocket connection."
+    },
+    {
+      "name": "3️⃣ Room Join (Colyseus Endpoint Check)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/matchmake/joinOrCreate/arena_room",
+          "host": ["{{baseUrl}}"],
+          "path": ["matchmake", "joinOrCreate", "arena_room"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"displayName\": \"PostmanTester\"\n}"
+        }
+      },
+      "description": "Tests Colyseus HTTP matchmaking endpoint.\nExpected: Room session data JSON response."
+    }
+  ]
+}

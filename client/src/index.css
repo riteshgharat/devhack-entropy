@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Press Start 2P", system-ui, sans-serif;
+  --font-body: "VT323", monospace;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+    @apply bg-sky-300 overflow-hidden;
+    image-rendering: pixelated;
+  }
+  
+  h1, h2, h3, h4, h5, h6, button {
+    font-family: var(--font-display);
+  }
+}
+
+@layer components {
+  .pixel-corners {
+    clip-path: polygon(
+      0px 4px, 4px 4px, 4px 0px,
+      calc(100% - 4px) 0px, calc(100% - 4px) 4px, 100% 4px,
+      100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+      4px 100%, 4px calc(100% - 4px), 0px calc(100% - 4px)
+    );
+  }
+
+  .pixel-corners-sm {
+    clip-path: polygon(
+      0px 2px, 2px 2px, 2px 0px,
+      calc(100% - 2px) 0px, calc(100% - 2px) 2px, 100% 2px,
+      100% calc(100% - 2px), calc(100% - 2px) calc(100% - 2px), calc(100% - 2px) 100%,
+      2px 100%, 2px calc(100% - 2px), 0px calc(100% - 2px)
+    );
+  }
+}
+
+/* Custom Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes pixel-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes cloud-move {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100vw); }
+}
+
+@keyframes blink {
+  0%, 90%, 100% { opacity: 1; }
+  95% { opacity: 0; }
+}
+
+.animate-blink {
+  animation: blink 4s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pixel-bounce {
+  animation: pixel-bounce 0.5s steps(2) infinite;
+}

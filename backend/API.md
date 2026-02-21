@@ -68,6 +68,61 @@ Returns recent match history (up to 10 entries). Reads from Redis first; falls b
 
 ---
 
+### `GET /api/leaderboard`
+
+Returns the top players based on wins and score. Reads from SQLite.
+
+**Response `200`**
+```json
+{
+  "leaderboard": [
+    {
+      "id": "id_abc123",
+      "displayName": "PixelKing",
+      "matches": 15,
+      "wins": 10,
+      "score": 4500
+    }
+  ]
+}
+```
+
+**Response `500`**
+```json
+{ "error": "Failed to fetch leaderboard" }
+```
+
+---
+
+### `GET /api/player/:id`
+
+Returns the stats for a specific player. Reads from SQLite.
+
+**Response `200`**
+```json
+{
+  "stats": {
+    "id": "id_abc123",
+    "displayName": "PixelKing",
+    "matches": 15,
+    "wins": 10,
+    "score": 4500
+  }
+}
+```
+
+**Response `404`**
+```json
+{ "error": "Player not found" }
+```
+
+**Response `500`**
+```json
+{ "error": "Failed to fetch player stats" }
+```
+
+---
+
 ## 2. WebSocket / Colyseus Room
 
 All real-time communication uses the Colyseus WebSocket protocol.
@@ -92,9 +147,12 @@ All real-time communication uses the Colyseus WebSocket protocol.
 | Field | Type | Description |
 |---|---|---|
 | `displayName` | `string` (optional) | Player display name. Defaults to `Player_<id>` |
+| `playerId` | `string` (optional) | Unique player ID. Defaults to `sessionId` |
+| `color` | `string` (optional) | Player color hex code. Defaults to a random color |
+| `customRoomId` | `string` (optional) | Custom room ID when creating a room |
 
 ```ts
-const room = await client.joinOrCreate("arena_room", { displayName: "MyName" });
+const room = await client.joinOrCreate("arena_room", { displayName: "MyName", playerId: "id_123", color: "#ef4444" });
 ```
 
 ---
@@ -210,6 +268,8 @@ The full game state is automatically synced to all clients via Colyseus `@Schema
 | Field | Type | Description |
 |---|---|---|
 | `displayName` | `string` | Player display name |
+| `playerId` | `string` | Unique player ID |
+| `color` | `string` | Player color hex code |
 | `x` | `float32` | X position |
 | `y` | `float32` | Y position |
 | `velocityX` | `float32` | X velocity |
@@ -281,6 +341,15 @@ CREATE TABLE IF NOT EXISTS match_history (
   is_draw        INTEGER DEFAULT 0,
   created_at     TEXT    DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS players (
+  id            TEXT PRIMARY KEY,
+  display_name  TEXT NOT NULL,
+  matches       INTEGER DEFAULT 0,
+  wins          INTEGER DEFAULT 0,
+  score         INTEGER DEFAULT 0,
+  created_at    TEXT DEFAULT (datetime('now'))
+);
 ```
 
 **Write — `saveMatchResult()`**: Called automatically at the end of every match.
@@ -290,6 +359,18 @@ INSERT INTO match_history (room_id, winner_id, winner_name, player_count, match_
 VALUES (?, ?, ?, ?, ?, ?)
 ```
 
+**Write — `savePlayerStats()`**: Called automatically at the end of every match for all players.
+
+```sql
+INSERT INTO players (id, display_name, matches, wins, score)
+VALUES (?, ?, 1, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  display_name = excluded.display_name,
+  matches = matches + 1,
+  wins = wins + excluded.wins,
+  score = score + excluded.score
+```
+
 **Read — `getRecentMatches(limit)`**: Used by `GET /api/matches`. Returns rows ordered by `created_at DESC`.
 
 ```sql
@@ -297,6 +378,23 @@ SELECT room_id, winner_id, winner_name, player_count, match_duration, is_draw
 FROM match_history
 ORDER BY created_at DESC
 LIMIT ?
+```
+
+**Read — `getLeaderboard(limit)`**: Used by `GET /api/leaderboard`. Returns rows ordered by `wins DESC, score DESC`.
+
+```sql
+SELECT id, display_name, matches, wins, score
+FROM players
+ORDER BY wins DESC, score DESC
+LIMIT ?
+```
+
+**Read — `getPlayerStats(id)`**: Used by `GET /api/player/:id`. Returns a single player's stats.
+
+```sql
+SELECT id, display_name, matches, wins, score
+FROM players
+WHERE id = ?
 ```
 
 ---

@@ -10,6 +10,92 @@ export interface MatchResult {
   isDraw: boolean;
 }
 
+export interface PlayerStat {
+  id: string;
+  displayName: string;
+  matches: number;
+  wins: number;
+  score: number;
+}
+
+export async function savePlayerStats(players: { id: string, displayName: string, isWinner: boolean, score: number }[]): Promise<void> {
+  if (isSQLiteAvailable()) {
+    try {
+      const db = getDB()!;
+      const stmt = db.prepare(`
+        INSERT INTO players (id, display_name, matches, wins, score)
+        VALUES (?, ?, 1, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          display_name = excluded.display_name,
+          matches = matches + 1,
+          wins = wins + excluded.wins,
+          score = score + excluded.score
+      `);
+      
+      const transaction = db.transaction((playersList) => {
+        for (const p of playersList) {
+          stmt.run(p.id, p.displayName, p.isWinner ? 1 : 0, p.score);
+        }
+      });
+      
+      transaction(players);
+      console.log("📝 Player stats saved to SQLite");
+    } catch (err: any) {
+      console.warn(`⚠️  SQLite player stats save failed: ${err.message}`);
+    }
+  }
+}
+
+export async function getLeaderboard(limit: number = 10): Promise<PlayerStat[]> {
+  if (isSQLiteAvailable()) {
+    try {
+      const db = getDB()!;
+      const rows = db.prepare(
+        `SELECT id, display_name, matches, wins, score
+         FROM players ORDER BY wins DESC, score DESC LIMIT ?`
+      ).all(limit) as any[];
+      return rows.map((row) => ({
+        id: row.id,
+        displayName: row.display_name,
+        matches: row.matches,
+        wins: row.wins,
+        score: row.score,
+      }));
+    } catch (err: any) {
+      console.warn(`⚠️  SQLite leaderboard read failed: ${err.message}`);
+    }
+  }
+  return [];
+}
+
+export async function getPlayerStats(playerId: string): Promise<(PlayerStat & { rank: number }) | null> {
+  if (isSQLiteAvailable()) {
+    try {
+      const db = getDB()!;
+      const row = db.prepare(
+        `SELECT id, display_name, matches, wins, score
+         FROM players WHERE id = ?`
+      ).get(playerId) as any;
+      if (row) {
+        const rankRow = db.prepare(
+          `SELECT COUNT(*) as rank FROM players WHERE wins > ? OR (wins = ? AND score > ?)`
+        ).get(row.wins, row.wins, row.score) as any;
+        return {
+          id: row.id,
+          displayName: row.display_name,
+          matches: row.matches,
+          wins: row.wins,
+          score: row.score,
+          rank: rankRow.rank + 1
+        };
+      }
+    } catch (err: any) {
+      console.warn(`⚠️  SQLite player stats read failed: ${err.message}`);
+    }
+  }
+  return null;
+}
+
 /**
  * Save match result to Redis (fast cache) and SQLite (persistent).
  * Both are optional — if either is unavailable, we skip gracefully.

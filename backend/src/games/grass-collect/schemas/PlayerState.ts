@@ -24,4 +24,10 @@ export class PlayerState extends Schema {
 
   /** Display name shown in-game */
   @type("string") displayName: string = "";
+
+  /** Unique player ID */
+  @type("string") playerId: string = "";
+
+  /** Player color */
+  @type("string") color: string = "#ffffff";
 }

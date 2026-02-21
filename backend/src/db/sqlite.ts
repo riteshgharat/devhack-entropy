@@ -4,7 +4,7 @@ import path from "path";
 let db: Database.Database | null = null;
 let isConnected = false;
 
-const DB_PATH = process.env.SQLITE_PATH || path.join(process.cwd(), "./src/db/chaos_arena.db");
+const DB_PATH = process.env.SQLITE_PATH || path.join(process.cwd(), "./src/db/data/chaos_arena.db");
 
 /**
  * Initialize SQLite database.
@@ -29,6 +29,18 @@ export function initSQLite(): Database.Database | null {
         match_duration REAL   NOT NULL,
         is_draw       INTEGER DEFAULT 0,
         created_at    TEXT    DEFAULT (datetime('now'))
+      );
+    `);
+
+    // Create players table if it doesn't exist
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS players (
+        id            TEXT PRIMARY KEY,
+        display_name  TEXT NOT NULL,
+        matches       INTEGER DEFAULT 0,
+        wins          INTEGER DEFAULT 0,
+        score         INTEGER DEFAULT 0,
+        created_at    TEXT DEFAULT (datetime('now'))
       );
     `);
 

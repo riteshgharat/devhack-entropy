@@ -16,6 +16,7 @@ import {
     Swords,
     ArrowLeft,
     Loader2,
+    Trophy,
 } from 'lucide-react';
 import { gameClient } from '../services/gameClient';
 
@@ -67,16 +68,19 @@ const MiniStickman: React.FC<{ color: string; size?: number }> = ({ color, size 
 };
 
 /* ── Tabs type ── */
-type LobbyTab = 'friends' | 'join' | 'create' | 'quick';
+type LobbyTab = 'leaderboard' | 'join' | 'create' | 'quick';
 
 interface MultiplayerLobbyProps {
     nightMode?: boolean;
+    characterColor?: string;
+    playerId: string;
+    displayName: string;
     onClose: () => void;
     onJoin: (room: any) => void;
 }
 
-export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, onClose, onJoin }) => {
-    const [activeTab, setActiveTab] = useState<LobbyTab>('friends');
+export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, characterColor = '#ef4444', playerId, displayName, onClose, onJoin }) => {
+    const [activeTab, setActiveTab] = useState<LobbyTab>('leaderboard');
     const [inviteCode, setInviteCode] = useState('');
     const [generatedCode, setGeneratedCode] = useState('');
     const [copied, setCopied] = useState(false);
@@ -84,19 +88,32 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
     const [searchDots, setSearchDots] = useState('');
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [leaderboard, setLeaderboard] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (activeTab === 'leaderboard') {
+            const headers: Record<string, string> = {};
+            if (import.meta.env.VITE_NGROK === 'true') {
+                headers['ngrok-skip-browser-warning'] = 'true';
+            }
+            fetch(`${import.meta.env.VITE_BACKEND_URL}/api/leaderboard`, { headers })
+                .then(res => res.json())
+                .then(data => setLeaderboard(data.leaderboard || []))
+                .catch(err => console.error("Failed to fetch leaderboard", err));
+        }
+    }, [activeTab]);
 
     const handleJoinOrCreate = async (mode: 'join' | 'create' | 'quick', code?: string) => {
         setIsConnecting(true);
         setError(null);
         try {
-            const displayName = localStorage.getItem('displayName') || `Player_${Math.floor(Math.random() * 1000)}`;
             let room;
             if (mode === 'create') {
-                room = await gameClient.joinOrCreate("arena_room", { displayName });
+                room = await gameClient.create("arena_room", { customRoomId: generatedCode, displayName, playerId, color: characterColor });
             } else if (mode === 'join' && code) {
-                room = await gameClient.join(code, { displayName });
+                room = await gameClient.join(code, { displayName, playerId, color: characterColor });
             } else if (mode === 'quick') {
-                room = await gameClient.joinOrCreate("arena_room", { displayName });
+                room = await gameClient.joinOrCreate("arena_room", { displayName, playerId, color: characterColor });
             }
 
             if (room) {
@@ -167,8 +184,8 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
 
                     {/* Tab bar */}
                     <div className="flex gap-1.5 mt-2 mb-4">
-                        <button className={tabBtnClass('friends')} onClick={() => setActiveTab('friends')}>
-                            <Users size={12} className="inline mr-1" />Friends
+                        <button className={tabBtnClass('leaderboard')} onClick={() => setActiveTab('leaderboard')}>
+                            <Trophy size={12} className="inline mr-1" />Leaderboard
                         </button>
                         <button className={tabBtnClass('join')} onClick={() => setActiveTab('join')}>
                             <DoorOpen size={12} className="inline mr-1" />Join
@@ -182,87 +199,56 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                     </div>
 
                     <AnimatePresence mode="wait">
-                        {/* ═══════ FRIENDS TAB ═══════ */}
-                        {activeTab === 'friends' && (
+                        {/* ═══════ LEADERBOARD TAB ═══════ */}
+                        {activeTab === 'leaderboard' && (
                             <motion.div
-                                key="friends"
+                                key="leaderboard"
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 20 }}
                                 transition={{ duration: 0.2 }}
                                 className="space-y-2"
                             >
-                                {/* Online section */}
-                                <div className={`font-display text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5 ${nightMode ? 'text-green-400' : 'text-green-600'
+                                <div className={`font-display text-[10px] uppercase tracking-wider mb-2 flex items-center gap-1.5 ${nightMode ? 'text-yellow-400' : 'text-yellow-600'
                                     }`}>
-                                    <Wifi size={10} />
-                                    Online — {ONLINE_FRIENDS.length}
+                                    <Trophy size={10} />
+                                    Top Players
                                 </div>
 
-                                {ONLINE_FRIENDS.map((friend) => (
-                                    <motion.div
-                                        key={friend.id}
-                                        className={`flex items-center gap-3 p-2 border-2 transition-colors cursor-pointer ${nightMode
-                                            ? 'bg-slate-700 border-slate-600 hover:bg-slate-600'
-                                            : 'bg-slate-50 border-slate-200 hover:bg-white'
-                                            }`}
-                                        whileHover={{ x: 4 }}
-                                    >
-                                        <MiniStickman color={friend.color} size={24} />
-                                        <div className="flex-1">
-                                            <div className={`font-display text-[10px] ${nightMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                                                {friend.name}
-                                            </div>
-                                            <div className={`font-body text-[11px] ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                Lvl. {friend.level}
-                                            </div>
-                                        </div>
-                                        <div className={`px-2 py-0.5 border text-[8px] font-display uppercase ${friend.status === 'online'
-                                            ? 'bg-green-100 border-green-400 text-green-700'
-                                            : 'bg-yellow-100 border-yellow-400 text-yellow-700'
-                                            }`}>
-                                            {friend.status === 'online' ? 'ONLINE' : 'IN GAME'}
-                                        </div>
-                                        {friend.status === 'online' && (
-                                            <PixelButton variant="primary" size="sm" className="text-[8px] py-1 px-2">
-                                                Invite
-                                            </PixelButton>
-                                        )}
-                                    </motion.div>
-                                ))}
-
-                                {/* Offline section */}
-                                <div className={`font-display text-[10px] uppercase tracking-wider mt-4 mb-2 flex items-center gap-1.5 ${nightMode ? 'text-slate-500' : 'text-slate-400'
-                                    }`}>
-                                    <WifiOff size={10} />
-                                    Offline — {OFFLINE_FRIENDS.length}
-                                </div>
-
-                                {OFFLINE_FRIENDS.map((friend) => (
-                                    <div
-                                        key={friend.id}
-                                        className={`flex items-center gap-3 p-2 border-2 opacity-50 ${nightMode
-                                            ? 'bg-slate-800 border-slate-700'
-                                            : 'bg-slate-100 border-slate-200'
-                                            }`}
-                                    >
-                                        <MiniStickman color="#6b7280" size={24} />
-                                        <div className="flex-1">
-                                            <div className={`font-display text-[10px] ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                                {friend.name}
-                                            </div>
-                                            <div className={`font-body text-[11px] ${nightMode ? 'text-slate-600' : 'text-slate-400'}`}>
-                                                Lvl. {friend.level}
-                                            </div>
-                                        </div>
-                                        <div className={`px-2 py-0.5 border text-[8px] font-display uppercase ${nightMode
-                                            ? 'bg-slate-700 border-slate-600 text-slate-500'
-                                            : 'bg-slate-200 border-slate-300 text-slate-400'
-                                            }`}>
-                                            OFFLINE
-                                        </div>
+                                {leaderboard.length === 0 ? (
+                                    <div className={`text-center py-4 font-body text-xs ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        No data available yet.
                                     </div>
-                                ))}
+                                ) : (
+                                    leaderboard.map((player, index) => {
+                                        const isMe = player.id === playerId;
+                                        return (
+                                            <motion.div
+                                                key={player.id}
+                                                className={`flex items-center gap-3 p-2 border-2 transition-colors ${isMe
+                                                    ? (nightMode ? 'bg-indigo-900/50 border-indigo-500' : 'bg-blue-100 border-blue-400')
+                                                    : (nightMode ? 'bg-slate-700 border-slate-600' : 'bg-slate-50 border-slate-200')
+                                                    }`}
+                                                whileHover={{ x: 4 }}
+                                            >
+                                                <div className={`font-display text-lg w-6 text-center ${index === 0 ? 'text-yellow-400' : index === 1 ? 'text-slate-300' : index === 2 ? 'text-amber-600' : nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                                    #{index + 1}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className={`font-display text-[12px] ${isMe ? (nightMode ? 'text-indigo-300' : 'text-blue-700') : (nightMode ? 'text-slate-200' : 'text-slate-800')}`}>
+                                                        {player.displayName} {isMe && '(You)'}
+                                                    </div>
+                                                    <div className={`font-body text-[10px] ${nightMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                        {player.wins} Wins • {player.matches} Matches
+                                                    </div>
+                                                </div>
+                                                <div className={`px-2 py-1 border text-[10px] font-display uppercase ${nightMode ? 'bg-indigo-900/50 border-indigo-500 text-indigo-300' : 'bg-blue-100 border-blue-400 text-blue-700'}`}>
+                                                    {player.score} PTS
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })
+                                )}
                             </motion.div>
                         )}
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { PixelCard } from './PixelCard';
 import { Trophy, Flame, Target, Swords, Shield, Star, TrendingUp } from 'lucide-react';
@@ -50,23 +50,54 @@ const PixelBar: React.FC<{ value: number; max: number; color: string; nightMode:
 };
 
 export const PlayerStats: React.FC<PlayerStatsProps> = ({ nightMode = false }) => {
-    const currentRank = RANK_TIERS[3]; // Platinum
-    const nextRank = RANK_TIERS[4]; // Diamond
-    const currentElo = 2640;
-    const progress = ((currentElo - currentRank.min) / (nextRank.min - currentRank.min)) * 100;
+    const [playerData, setPlayerData] = useState<any>(null);
+    const [recentMatches, setRecentMatches] = useState<any[]>([]);
+
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const headers: Record<string, string> = {};
+                if (import.meta.env.VITE_NGROK === 'true') {
+                    headers['ngrok-skip-browser-warning'] = 'true';
+                }
+
+                const playerId = localStorage.getItem('playerId');
+                if (playerId) {
+                    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/player/${playerId}`, { headers });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setPlayerData(data.stats);
+                    }
+                }
+                
+                const matchesRes = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/matches`, { headers });
+                if (matchesRes.ok) {
+                    const data = await matchesRes.json();
+                    setRecentMatches(data.matches || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch stats", err);
+            }
+        };
+        fetchStats();
+    }, []);
+
+    const currentElo = playerData ? playerData.score : 0;
+    let currentRank = RANK_TIERS[0];
+    let nextRank = RANK_TIERS[1];
+    for (let i = 0; i < RANK_TIERS.length; i++) {
+        if (currentElo >= RANK_TIERS[i].min) {
+            currentRank = RANK_TIERS[i];
+            nextRank = RANK_TIERS[i + 1] || RANK_TIERS[i];
+        }
+    }
+    const progress = nextRank.min > currentRank.min ? ((currentElo - currentRank.min) / (nextRank.min - currentRank.min)) * 100 : 100;
 
     const stats = [
-        { icon: Swords, label: 'Matches', value: '347', color: '#ef4444' },
-        { icon: Trophy, label: 'Wins', value: '198', color: '#eab308' },
-        { icon: Target, label: 'Win Rate', value: '57%', color: '#22c55e' },
-        { icon: Flame, label: 'Streak', value: '7 🔥', color: '#f97316' },
-    ];
-
-    const recentMatches = [
-        { result: 'W', opponent: 'GlitchWitch', score: '3-1', time: '2m ago' },
-        { result: 'W', opponent: 'RetroRogue', score: '3-2', time: '18m ago' },
-        { result: 'L', opponent: 'NeonNinja', score: '1-3', time: '1h ago' },
-        { result: 'W', opponent: 'ByteBarb', score: '3-0', time: '2h ago' },
+        { icon: Swords, label: 'Matches', value: playerData ? playerData.matches : 0, color: '#ef4444' },
+        { icon: Trophy, label: 'Wins', value: playerData ? playerData.wins : 0, color: '#eab308' },
+        { icon: Target, label: 'Win Rate', value: playerData && playerData.matches > 0 ? `${Math.round((playerData.wins / playerData.matches) * 100)}%` : '0%', color: '#22c55e' },
+        { icon: Flame, label: 'Score', value: playerData ? playerData.score : 0, color: '#f97316' },
     ];
 
     return (
@@ -97,7 +128,7 @@ export const PlayerStats: React.FC<PlayerStatsProps> = ({ nightMode = false }) =
                                 {currentRank.name}
                             </span>
                             <span className={`font-body text-xs ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                #{currentElo}
+                                #{playerData ? playerData.rank : 0}
                             </span>
                         </div>
                         <div className="mt-1">
@@ -146,33 +177,36 @@ export const PlayerStats: React.FC<PlayerStatsProps> = ({ nightMode = false }) =
                         Recent Matches
                     </div>
                     <div className="space-y-1">
-                        {recentMatches.map((m, i) => (
-                            <motion.div
-                                key={i}
-                                className={`flex items-center gap-2 px-2 py-1.5 border ${nightMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'
-                                    } transition-colors`}
-                                initial={{ x: 10, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.5 + i * 0.08 }}
-                            >
-                                <div
-                                    className={`w-5 h-5 flex items-center justify-center font-display text-[9px] text-white border ${m.result === 'W' ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'
-                                        }`}
+                        {recentMatches.slice(0, 4).map((m, i) => {
+                            const isWin = m.winnerId === localStorage.getItem('playerId');
+                            return (
+                                <motion.div
+                                    key={i}
+                                    className={`flex items-center gap-2 px-2 py-1.5 border ${nightMode ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-100 hover:bg-slate-50'
+                                        } transition-colors`}
+                                    initial={{ x: 10, opacity: 0 }}
+                                    animate={{ x: 0, opacity: 1 }}
+                                    transition={{ delay: 0.5 + i * 0.08 }}
                                 >
-                                    {m.result}
-                                </div>
-                                <span className={`font-display text-[10px] flex-1 ${nightMode ? 'text-slate-300' : 'text-slate-700'
-                                    }`}>
-                                    {m.opponent}
-                                </span>
-                                <span className={`font-body text-[11px] ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                                    {m.score}
-                                </span>
-                                <span className={`font-body text-[10px] ${nightMode ? 'text-slate-600' : 'text-slate-300'}`}>
-                                    {m.time}
-                                </span>
-                            </motion.div>
-                        ))}
+                                    <div
+                                        className={`w-5 h-5 flex items-center justify-center font-display text-[9px] text-white border ${isWin ? 'bg-green-500 border-green-700' : 'bg-red-500 border-red-700'
+                                            }`}
+                                    >
+                                        {isWin ? 'W' : 'L'}
+                                    </div>
+                                    <span className={`font-display text-[10px] flex-1 ${nightMode ? 'text-slate-300' : 'text-slate-700'
+                                        }`}>
+                                        {m.winnerName || 'Draw'}
+                                    </span>
+                                    <span className={`font-body text-[11px] ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        {m.playerCount}P
+                                    </span>
+                                    <span className={`font-body text-[10px] ${nightMode ? 'text-slate-600' : 'text-slate-300'}`}>
+                                        {Math.round(m.matchDuration)}s
+                                    </span>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
 

@@ -18,7 +18,7 @@ import {
   GRASS_RADIUS,
   PLAYER_RADIUS,
 } from "../utils/constants";
-import { saveMatchResult } from "../../../db/matchHistory";
+import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
 
 // ─── Message types from the client ───────────────────────
 interface MoveInput {
@@ -36,7 +36,10 @@ export class GameRoom extends Room<GameState> {
 
   // ───── Room lifecycle ────────────────────────────────────
 
-  onCreate(_options: any) {
+  async onCreate(options: any) {
+    if (options.customRoomId) {
+      this.roomId = options.customRoomId;
+    }
     this.state = new GameState();
     this.maxClients = MAX_PLAYERS;
 
@@ -57,7 +60,7 @@ export class GameRoom extends Room<GameState> {
     console.log(`���️  GameRoom created | Room ID: ${this.roomId}`);
   }
 
-  onJoin(client: Client, options: JoinOptions) {
+  onJoin(client: Client, options: any) {
     const player = new PlayerState();
 
     // Random spawn position within safe margin
@@ -66,6 +69,10 @@ export class GameRoom extends Room<GameState> {
     player.score = 0;
     player.displayName =
       options?.displayName || `Player_${client.sessionId.slice(0, 4)}`;
+    player.playerId = options?.playerId || client.sessionId;
+
+    const colors = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
+    player.color = options?.color || colors[this.state.players.size % colors.length];
 
     this.state.players.set(client.sessionId, player);
 
@@ -314,6 +321,18 @@ export class GameRoom extends Room<GameState> {
       maxScore,
       isDraw,
     });
+
+    const playerStatsToSave: { id: string, displayName: string, isWinner: boolean, score: number }[] = [];
+    this.state.players.forEach((player: PlayerState, sessionId: string) => {
+      playerStatsToSave.push({
+        id: player.playerId || sessionId,
+        displayName: player.displayName,
+        isWinner: !isDraw && sessionId === winnerId,
+        score: player.score
+      });
+    });
+
+    savePlayerStats(playerStatsToSave).catch((err) => console.warn(`⚠️  Failed to save player stats: ${err.message}`));
 
     // Persist match result to database (async, non-blocking)
     saveMatchResult({

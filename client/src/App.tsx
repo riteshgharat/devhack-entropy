@@ -6,7 +6,7 @@ import { PlayerStats } from './components/PlayerStats';
 import { SplashScreen } from './components/SplashScreen';
 import { MultiplayerLobby } from './components/MultiplayerLobby';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Volume2, Monitor, Sun, Moon } from 'lucide-react';
+import { Settings, Volume2, Monitor, Sun, Moon, User } from 'lucide-react';
 import { PixelCard } from './components/PixelCard';
 import { GameArena } from './components/GameArena';
 import { gameClient } from './services/gameClient';
@@ -17,22 +17,49 @@ function App() {
   const [showSplash, setShowSplash] = React.useState(true);
   const [nightMode, setNightMode] = React.useState(true); // default NIGHT
   const [showMultiplayer, setShowMultiplayer] = React.useState(false);
-  const [characterColor, setCharacterColor] = React.useState('#ef4444');
+  const [characterColor, setCharacterColor] = React.useState(localStorage.getItem('playerColor') || '#ef4444');
   const [activeRoom, setActiveRoom] = React.useState<Room | null>(null);
   const [displayName, setDisplayName] = React.useState(localStorage.getItem('displayName') || `Player_${Math.floor(Math.random() * 1000)}`);
+  const [playerId] = React.useState(() => {
+    let id = localStorage.getItem('playerId');
+    if (!id) {
+      id = `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('playerId', id);
+    }
+    return id;
+  });
 
   React.useEffect(() => {
     localStorage.setItem('displayName', displayName);
   }, [displayName]);
 
+  React.useEffect(() => {
+    localStorage.setItem('playerColor', characterColor);
+  }, [characterColor]);
+
+  React.useEffect(() => {
+    const token = sessionStorage.getItem('reconnectionToken');
+    if (token) {
+      gameClient.reconnect(token).then((room) => {
+        setActiveRoom(room);
+        setShowSplash(false);
+      }).catch((err) => {
+        console.error("Failed to reconnect", err);
+        sessionStorage.removeItem('reconnectionToken');
+      });
+    }
+  }, []);
+
   const handleJoinRoom = (room: Room) => {
     setActiveRoom(room);
+    sessionStorage.setItem('reconnectionToken', room.reconnectionToken);
     setShowMultiplayer(false);
   };
 
   const handleLeaveRoom = () => {
     gameClient.leave();
     setActiveRoom(null);
+    sessionStorage.removeItem('reconnectionToken');
   };
 
   if (showSplash) {
@@ -196,6 +223,9 @@ function App() {
         {showMultiplayer && (
           <MultiplayerLobby
             nightMode={nightMode}
+            characterColor={characterColor}
+            playerId={playerId}
+            displayName={displayName}
             onClose={() => setShowMultiplayer(false)}
             onJoin={handleJoinRoom}
           />
@@ -212,6 +242,23 @@ function App() {
           >
             <PixelCard title="Settings" className="mx-4" nightMode={nightMode}>
               <div className="space-y-6 mt-4">
+                <div className="space-y-2">
+                  <label className={`font-display text-xs uppercase flex items-center gap-2 transition-colors duration-700 ${nightMode ? 'text-slate-400' : 'text-slate-500'
+                    }`}>
+                    <User size={14} /> Player Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={`w-full p-2 border-2 font-display text-xs outline-none transition-colors duration-700 ${nightMode
+                      ? 'bg-slate-700 border-slate-600 text-slate-200 focus:border-indigo-500'
+                      : 'bg-white border-slate-300 text-slate-800 focus:border-green-500'
+                      }`}
+                    maxLength={15}
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <label className={`font-display text-xs uppercase flex items-center gap-2 transition-colors duration-700 ${nightMode ? 'text-slate-400' : 'text-slate-500'
                     }`}>

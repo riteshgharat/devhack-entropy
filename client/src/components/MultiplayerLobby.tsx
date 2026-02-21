@@ -76,7 +76,7 @@ interface MultiplayerLobbyProps {
     playerId: string;
     displayName: string;
     onClose: () => void;
-    onJoin: (room: any) => void;
+    onJoin: (room: any, gameType?: string) => void;
 }
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, characterColor = '#ef4444', playerId, displayName, onClose, onJoin }) => {
@@ -89,6 +89,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
     const [isConnecting, setIsConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [leaderboard, setLeaderboard] = useState<any[]>([]);
+    const [selectedGame, setSelectedGame] = useState<'arena_room' | 'bouncy_tiles' | 'hot_dynamite'>('arena_room');
 
     useEffect(() => {
         if (activeTab === 'leaderboard') {
@@ -108,16 +109,17 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
         setError(null);
         try {
             let room;
+            const roomType = selectedGame;
             if (mode === 'create') {
-                room = await gameClient.create("arena_room", { customRoomId: generatedCode, displayName, playerId, color: characterColor });
+                room = await gameClient.create(roomType, { customRoomId: generatedCode, displayName, playerId, color: characterColor });
             } else if (mode === 'join' && code) {
                 room = await gameClient.join(code, { displayName, playerId, color: characterColor });
             } else if (mode === 'quick') {
-                room = await gameClient.joinOrCreate("arena_room", { displayName, playerId, color: characterColor });
+                room = await gameClient.joinOrCreate(roomType, { displayName, playerId, color: characterColor });
             }
 
             if (room) {
-                onJoin(room);
+                onJoin(room, roomType);
             }
         } catch (err: any) {
             setError(err.message || "Failed to connect to game server");
@@ -181,6 +183,52 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                     >
                         <X size={14} />
                     </button>
+
+                    {/* Game Selection */}
+                    <div className="mb-4">
+                        <p className={`font-display text-[10px] uppercase tracking-wider mb-2 ${nightMode ? 'text-slate-400' : 'text-slate-500'}`}>Select Game</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setSelectedGame('arena_room')}
+                                className={`flex-1 py-3 border-4 font-display text-xs uppercase transition-all duration-300 ${selectedGame === 'arena_room'
+                                    ? nightMode
+                                        ? 'bg-green-700 border-green-500 text-white shadow-[0_0_12px_rgba(34,197,94,0.3)]'
+                                        : 'bg-green-500 border-green-700 text-white shadow-md'
+                                    : nightMode
+                                        ? 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                                        : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                                    }`}
+                            >
+                                🌿 Chaos Arena
+                            </button>
+                            <button
+                                onClick={() => setSelectedGame('bouncy_tiles')}
+                                className={`flex-1 py-3 border-4 font-display text-xs uppercase transition-all duration-300 ${selectedGame === 'bouncy_tiles'
+                                    ? nightMode
+                                        ? 'bg-red-700 border-red-500 text-white shadow-[0_0_12px_rgba(239,68,68,0.3)]'
+                                        : 'bg-red-500 border-red-700 text-white shadow-md'
+                                    : nightMode
+                                        ? 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                                        : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                                    }`}
+                            >
+                                🟥 Bouncy Tiles
+                            </button>
+                            <button
+                                onClick={() => setSelectedGame('hot_dynamite')}
+                                className={`flex-1 py-3 border-4 font-display text-xs uppercase transition-all duration-300 ${selectedGame === 'hot_dynamite'
+                                    ? nightMode
+                                        ? 'bg-orange-700 border-orange-500 text-white shadow-[0_0_12px_rgba(249,115,22,0.3)]'
+                                        : 'bg-orange-500 border-orange-700 text-white shadow-md'
+                                    : nightMode
+                                        ? 'bg-slate-700 border-slate-600 text-slate-400 hover:bg-slate-600'
+                                        : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
+                                    }`}
+                            >
+                                🧨 Hot Dynamite
+                            </button>
+                        </div>
+                    </div>
 
                     {/* Tab bar */}
                     <div className="flex gap-1.5 mt-2 mb-4">

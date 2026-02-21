@@ -6,6 +6,8 @@ dotenv.config();
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./games/grass-collect/rooms/GameRoom";
+import { GameRoom as BouncyTilesRoom } from "./games/shadow-survive/rooms/GameRoom";
+import { HotDynamiteRoom } from "./games/hot-dynamite/rooms/GameRoom";
 import { initRedis } from "./db/redis";
 import { initSQLite } from "./db/sqlite";
 import { getRecentMatches, getLeaderboard, getPlayerStats } from "./db/matchHistory";
@@ -72,6 +74,8 @@ const gameServer = new Server({
 
 // Register game rooms
 gameServer.define("arena_room", GameRoom);
+gameServer.define("bouncy_tiles", BouncyTilesRoom);
+gameServer.define("hot_dynamite", HotDynamiteRoom);
 
 // ─── Initialize databases (optional, graceful fallback) ───
 initRedis();

@@ -1,0 +1,73 @@
+{
+	"info": {
+		"_postman_id": "c7a8b9c0-d1e2-4f3a-b4c5-d6e7f8a9b0c1",
+		"name": "Chaos Arena API",
+		"description": "API and WebSocket collection for testing Phase 2 of Chaos Arena Backend",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health Check",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/health",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"health"
+					]
+				},
+				"description": "Checks if the backend server is running."
+			},
+			"response": []
+		},
+		{
+			"name": "WebSocket Connection",
+			"protocolProfileBehavior": {
+				"disabledSystemHeaders": {}
+			},
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "ws://localhost:3000/arena_room",
+					"protocol": "ws",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"arena_room"
+					]
+				},
+				"description": "Connect to the arena_room via WebSockets. Use Postman's WebSocket request type for this."
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+}

@@ -13,7 +13,7 @@ This backend is designed to:
 
 For hackathon:
 → Single node deployment  
-→ Redis + PostgreSQL optional (can mock)  
+→ Redis + SQLite optional
 → AI Worker disabled  
 
 Architecture remains production-ready.
@@ -32,7 +32,7 @@ Colyseus Game Cluster
         ↓
 Redis (Presence + PubSub + Leaderboard)
         ↓
-PostgreSQL (Persistent Data)
+SQLite (Persistent Data — embedded)
         ↓
 AI Worker Layer (Optional - Future)
 
@@ -57,10 +57,10 @@ AI Worker Layer (Optional - Future)
   - Sorted Sets (Leaderboard)
 
 ## Database
-- PostgreSQL
-  - User Profiles
+- SQLite (via better-sqlite3)
   - Match History
-  - Tournament Data
+  - Embedded — no server required
+  - File: `chaos_arena.db`
 
 ## Optional AI Layer (Future)
 - BullMQ (Redis-backed queue)
@@ -147,7 +147,7 @@ Server authoritative simulation.
 6️⃣ Server validates and updates state  
 7️⃣ State patches broadcast to clients  
 8️⃣ Match ends  
-9️⃣ Score stored in Redis + PostgreSQL  
+9️⃣ Score stored in Redis + SQLite  
 
 ---
 
@@ -252,7 +252,7 @@ Game Node 3
 All connected to:
 
 - Same Redis Cluster
-- Same PostgreSQL
+- Same SQLite file (or swap to a dedicated DB for true horizontal scale)
 
 Load Balancer:
 
@@ -306,7 +306,7 @@ Simplified:
 
 ✔ Single Colyseus instance  
 ✔ Single Redis instance  
-✔ PostgreSQL optional (can mock)  
+✔ SQLite embedded (no separate DB server)  
 ✔ No horizontal scaling  
 ✔ AI disabled  
 
@@ -330,7 +330,7 @@ Colyseus Cluster
   ↓
 Redis
   ↓
-PostgreSQL
+SQLite
 
 Optional:
   ↓

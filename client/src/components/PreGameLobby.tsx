@@ -173,7 +173,7 @@ export const PreGameLobby: React.FC<PreGameLobbyProps> = ({
                   nightMode ? "text-slate-400" : "text-amber-700"
                 }`}
               >
-                ID: {room.id}
+                ID: {room.roomId}
               </span>
             </div>
             <h2

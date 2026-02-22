@@ -24,12 +24,13 @@ import { TurfSoccerGame } from "./components/games/TurfSoccerGame";
 import { CommunicationHub } from "./components/CommunicationHub";
 import { gameClient } from "./services/gameClient";
 import { Room } from "colyseus.js";
-import {
-  VoiceSettings,
-  loadVoiceSettings,
-  saveVoiceSettings,
-} from "./services/voiceCommentary";
-import { Mic, MicOff } from "lucide-react";
+// DISABLED — Sarvam TTS voice commentary commented out
+// import {
+//   VoiceSettings,
+//   loadVoiceSettings,
+//   saveVoiceSettings,
+// } from "./services/voiceCommentary";
+// import { Mic, MicOff } from "lucide-react";
 
 function App() {
   const [showSettings, setShowSettings] = React.useState(false);
@@ -47,8 +48,9 @@ function App() {
   const [activeRoom, setActiveRoom] = React.useState<Room | null>(null);
   const [gameStarted, setGameStarted] = React.useState(false);
   const [showArenaEntry, setShowArenaEntry] = React.useState(false);
-  const [voiceSettings, setVoiceSettings] =
-    React.useState<VoiceSettings>(loadVoiceSettings);
+  // DISABLED — Sarvam TTS voice commentary commented out
+  // const [voiceSettings, setVoiceSettings] =
+  //   React.useState<VoiceSettings>(loadVoiceSettings);
 
   // Auth state
   const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(
@@ -68,10 +70,10 @@ function App() {
     }
   }, [currentUser]);
 
-  // Persist voice settings whenever they change
-  React.useEffect(() => {
-    saveVoiceSettings(voiceSettings);
-  }, [voiceSettings]);
+  // DISABLED — Sarvam TTS voice commentary commented out
+  // React.useEffect(() => {
+  //   saveVoiceSettings(voiceSettings);
+  // }, [voiceSettings]);
   const [displayName, setDisplayName] = React.useState(
     localStorage.getItem("displayName") ||
       `Player_${Math.floor(Math.random() * 1000)}`,
@@ -321,7 +323,7 @@ function App() {
                 room={activeRoom}
                 nightMode={nightMode}
                 mySessionId={activeRoom.sessionId}
-                voiceSettings={voiceSettings}
+                // voiceSettings={voiceSettings} // DISABLED — Sarvam TTS commentary
               />
             </div>
           </div>
@@ -595,7 +597,8 @@ function App() {
                   }`}>{currentUser ? currentUser.username : displayName}</span>
                 </button>
 
-                {/* ── Voice Commentary ── */}
+                {/* ── Voice Commentary — DISABLED (Sarvam TTS commented out) ── */}
+                {/*
                 <div className="space-y-3">
                   <label
                     className={`font-display text-xs uppercase flex items-center gap-2 ${nightMode ? "text-slate-400" : "text-slate-500"}`}
@@ -722,6 +725,7 @@ function App() {
                     </>
                   )}
                 </div>
+                */}
 
                 {/* Theme toggle inside settings */}
                 <div className="space-y-2">

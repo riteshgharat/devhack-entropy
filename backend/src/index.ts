@@ -16,7 +16,7 @@ import {
   getPlayerStats,
   updatePlayerName,
 } from "./db/matchHistory";
-import { synthesizeSpeech, VoiceLanguage, VoiceGender } from "./ai/sarvamTTS";
+// import { synthesizeSpeech, VoiceLanguage, VoiceGender } from "./ai/sarvamTTS"; // DISABLED — Sarvam TTS commented out
 
 import cors from "cors";
 
@@ -84,7 +84,9 @@ app.post("/api/player/name", async (req, res) => {
   }
 });
 
-// ─── Sarvam TTS proxy (keeps API key server-side) ─────────
+// ─── Sarvam TTS proxy — DISABLED ──────────────────────────
+// Sarvam TTS commentary commented out
+/*
 app.post("/api/tts", async (req, res) => {
   const { text, language, gender } = req.body as {
     text?: string;
@@ -113,6 +115,7 @@ app.post("/api/tts", async (req, res) => {
       .json({ error: "TTS generation failed", detail: err?.message });
   }
 });
+*/
 
 const server = createServer(app);
 

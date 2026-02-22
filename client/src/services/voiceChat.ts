@@ -27,20 +27,103 @@
 
 import { Room } from "colyseus.js";
 
-// ICE servers: Google STUN + Open Relay TURN (free, handles cross-NAT / cross-network)
-const ICE_SERVERS: RTCIceServer[] = [
+/**
+ * ICE server configuration.
+ *
+ * For cross-network / cross-NAT voice chat to work, you NEED a TURN relay.
+ * STUN alone only works when both peers are on the same subnet or have
+ * non-symmetric NAT.
+ *
+ * Setup (free, takes 60 seconds):
+ *   1. Sign up at https://www.metered.ca/signup (free tier = 500 GB/mo)
+ *   2. Create an app (any name, e.g. "chaosarena")
+ *   3. Copy your API key from the dashboard
+ *   4. Add to client/.env:
+ *        VITE_METERED_API_KEY=your_api_key_here
+ *
+ * Alternatively, provide manual TURN credentials:
+ *   VITE_TURN_URL=turn:your.turn.server:3478
+ *   VITE_TURN_USER=username
+ *   VITE_TURN_PASS=credential
+ */
+
+// ── STUN servers (always included, free, no auth) ──
+const STUN_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
-  {
-    urls: [
-      "turn:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:443",
-      "turn:openrelay.metered.ca:443?transport=tcp",
-    ],
-    username: "openrelayproject",
-    credential: "openrelayproject",
-  },
+  { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
+  { urls: "stun:stun.relay.metered.ca:80" },
 ];
+
+/** Cache so we only fetch once per page load */
+let _cachedIceServers: RTCIceServer[] | null = null;
+
+/**
+ * Fetch ICE servers (STUN + TURN). Tries in order:
+ *  1. Metered.ca free API  (VITE_METERED_API_KEY)
+ *  2. Manual TURN env vars (VITE_TURN_URL / USER / PASS)
+ *  3. STUN-only fallback   (will fail across NATs)
+ */
+async function fetchIceServers(): Promise<RTCIceServer[]> {
+  if (_cachedIceServers) return _cachedIceServers;
+
+  const servers: RTCIceServer[] = [...STUN_SERVERS];
+  let hasTurn = false;
+
+  // ── 1. Metered.ca dynamic TURN credentials ──
+  const meteredKey = (import.meta as any).env?.VITE_METERED_API_KEY;
+  if (meteredKey) {
+    try {
+      const resp = await fetch(
+        `https://chaosarena.metered.live/api/v1/turn/credentials?apiKey=${meteredKey}`,
+      );
+      if (resp.ok) {
+        const turnServers: RTCIceServer[] = await resp.json();
+        servers.push(...turnServers);
+        hasTurn = true;
+        console.log(
+          "[VoiceChat] ✓ Fetched",
+          turnServers.length,
+          "TURN servers from Metered.ca",
+        );
+      } else {
+        console.warn(
+          "[VoiceChat] Metered API returned",
+          resp.status,
+          "— check your VITE_METERED_API_KEY",
+        );
+      }
+    } catch (err) {
+      console.warn("[VoiceChat] Failed to fetch Metered TURN credentials:", err);
+    }
+  }
+
+  // ── 2. Manual TURN from env vars ──
+  const customUrl = (import.meta as any).env?.VITE_TURN_URL;
+  const customUser = (import.meta as any).env?.VITE_TURN_USER;
+  const customPass = (import.meta as any).env?.VITE_TURN_PASS;
+  if (customUrl && !customUrl.includes("your.server")) {
+    servers.push({
+      urls: customUrl,
+      username: customUser || "",
+      credential: customPass || "",
+    });
+    hasTurn = true;
+    console.log("[VoiceChat] ✓ Custom TURN server added:", customUrl);
+  }
+
+  if (!hasTurn) {
+    console.warn(
+      "[VoiceChat] ⚠ NO TURN SERVER CONFIGURED — voice chat will ONLY work on the same subnet.\n" +
+        "  → Set VITE_METERED_API_KEY in .env (free: https://www.metered.ca/signup)",
+    );
+  }
+
+  _cachedIceServers = servers;
+  return servers;
+}
 
 export interface VoicePeer {
   sessionId: string;
@@ -66,6 +149,11 @@ export class VoiceChat {
   private iceCandidateQueue = new Map<string, RTCIceCandidateInit[]>();
   /** Track which PCs have a remote description set (safe to add candidates) */
   private remoteDescSet = new Set<string>();
+  /** ICE restart attempt counter per peer */
+  private iceRestartCount = new Map<string, number>();
+  private static MAX_ICE_RESTARTS = 3;
+  /** Resolved ICE servers (fetched once at join time) */
+  private iceServers: RTCIceServer[] = STUN_SERVERS;
   /** Audio elements keyed by peerId — kept alive to avoid GC stopping playback */
   private audioEls = new Map<string, HTMLAudioElement>();
   private offHandlers: Array<() => void> = [];
@@ -98,6 +186,9 @@ export class VoiceChat {
 
   async join(): Promise<void> {
     if (this._isJoined) return;
+
+    // Fetch TURN credentials (cached after first call)
+    this.iceServers = await fetchIceServers();
 
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
@@ -277,8 +368,14 @@ export class VoiceChat {
         candidate: RTCIceCandidateInit;
       }) => {
         if (!candidate) return;
+        console.log(
+          `[VoiceChat] Incoming ICE candidate from ${from}: ${candidate.candidate?.substring(0, 80)}`,
+        );
         const pc = this.pcs.get(from);
-        if (!pc) return;
+        if (!pc) {
+          console.warn(`[VoiceChat] No PC for ICE candidate from ${from}`);
+          return;
+        }
 
         if (this.remoteDescSet.has(from)) {
           try {
@@ -315,7 +412,7 @@ export class VoiceChat {
 
     console.log("[VoiceChat] Creating RTCPeerConnection for:", peerId);
     const pc = new RTCPeerConnection({
-      iceServers: ICE_SERVERS,
+      iceServers: this.iceServers,
       iceCandidatePoolSize: 10,
     });
 
@@ -353,10 +450,16 @@ export class VoiceChat {
     // Relay ICE candidates to peer via signaling
     pc.onicecandidate = (evt) => {
       if (evt.candidate) {
+        const c = evt.candidate;
+        console.log(
+          `[VoiceChat] Outgoing ICE candidate for ${peerId}: type=${c.type} protocol=${c.protocol} address=${c.address}:${c.port}`,
+        );
         this._safeSend("voice_ice", {
           to: peerId,
-          candidate: evt.candidate.toJSON(),
+          candidate: c.toJSON(),
         });
+      } else {
+        console.log(`[VoiceChat] ICE gathering complete for ${peerId}`);
       }
     };
 
@@ -377,8 +480,25 @@ export class VoiceChat {
         pc.iceConnectionState,
       );
       if (pc.iceConnectionState === "failed") {
-        console.warn("[VoiceChat] ICE failed for", peerId, "— restarting ICE");
-        pc.restartIce();
+        const attempts = (this.iceRestartCount.get(peerId) || 0) + 1;
+        this.iceRestartCount.set(peerId, attempts);
+        if (attempts <= VoiceChat.MAX_ICE_RESTARTS) {
+          console.warn(
+            `[VoiceChat] ICE failed for ${peerId} — attempt ${attempts}/${VoiceChat.MAX_ICE_RESTARTS}, renegotiating...`,
+          );
+          // Full renegotiation: close old PC, create new one, send fresh offer
+          this._closePeer(peerId);
+          this._createOffer(peerId);
+        } else {
+          console.error(
+            `[VoiceChat] ICE failed for ${peerId} after ${VoiceChat.MAX_ICE_RESTARTS} attempts — giving up`,
+          );
+        }
+      }
+      if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+        // Reset restart counter on success
+        this.iceRestartCount.delete(peerId);
+        console.log(`[VoiceChat] ✓ Connected to ${peerId}`);
       }
       if (pc.iceConnectionState === "closed") {
         this._closePeer(peerId);
@@ -503,6 +623,7 @@ export class VoiceChat {
     this.pcs.clear();
     this.remoteDescSet.clear();
     this.iceCandidateQueue.clear();
+    this.iceRestartCount.clear();
     this.audioEls.clear();
     this.peers.clear();
 

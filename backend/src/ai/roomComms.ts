@@ -1,6 +1,6 @@
 import { Room } from "@colyseus/core";
 import { ChatMessage, EmojiEvent, AIInput, AIOutput } from "./types";
-import { callGemini } from "./geminiService";
+// import { callGemini } from "./geminiService"; // DISABLED — Gemini AI flow commented out
 
 // How often the AI Game-Master fires (ms)
 const AI_INTERVAL_MS = 10000;
@@ -39,12 +39,13 @@ export class RoomComms {
   }
 
   // ─── Call from the room's update/tick loop ─────────────────────────────────
-  tick(deltaTimeMs: number) {
-    this.aiTimer += deltaTimeMs;
-    if (this.aiTimer >= AI_INTERVAL_MS && !this.aiRunning) {
-      this.aiTimer = 0;
-      this._runAI();
-    }
+  tick(_deltaTimeMs: number) {
+    // DISABLED — Gemini AI agentic flow commented out
+    // this.aiTimer += _deltaTimeMs;
+    // if (this.aiTimer >= AI_INTERVAL_MS && !this.aiRunning) {
+    //   this.aiTimer = 0;
+    //   this._runAI();
+    // }
   }
 
   // ─── Push notable game events for AI context (e.g. "player X eliminated") ─
@@ -219,20 +220,26 @@ export class RoomComms {
   }
 
   // ─── AI tick ───────────────────────────────────────────────────────────────
-  private async _runAI() {
-    this.aiRunning = true;
-    try {
-      const input = this._buildAIInput();
-      const output = await callGemini(input);
-      this.latestOutput = output;
-      this._broadcastOutput(output);
-    } catch (err) {
-      console.warn("[RoomComms] AI tick error:", err);
-    } finally {
-      this.aiRunning = false;
-    }
-  }
+  // DISABLED — Gemini AI agentic flow commented out
+  // private async _runAI() {
+  //   this.aiRunning = true;
+  //   try {
+  //     const input = this._buildAIInput();
+  //     const output = await callGemini(input);
+  //     this.latestOutput = output;
+  //     this._broadcastOutput(output);
+  //   } catch (err) {
+  //     console.warn("[RoomComms] AI tick error:", err);
+  //   } finally {
+  //     this.aiRunning = false;
+  //   }
+  // }
 
+  // DISABLED — Gemini AI agentic flow commented out
+  // private _buildAIInput(): AIInput { ... }
+  // private _broadcastOutput(output: AIOutput) { ... }
+
+  /*
   private _buildAIInput(): AIInput {
     const state = this.room.state;
     const players: any[] = [];
@@ -297,4 +304,5 @@ export class RoomComms {
       );
     }
   }
+  */
 }

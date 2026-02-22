@@ -176,10 +176,10 @@ export const CommunicationHub: React.FC<Props> = ({
     const handlers = [
       room.onMessage("chat_message", (msg: ChatMsg) => {
         setChat((prev) => [...prev.slice(-49), msg]);
-        // Speak AI Game-Master messages aloud using the current (ref) voice settings
-        if (msg.playerId === "ai_game_master" && voiceSettingsRef.current) {
-          speakCommentary(msg.text, voiceSettingsRef.current);
-        }
+        // DISABLED — Sarvam TTS commentary commented out
+        // if (msg.playerId === "ai_game_master" && voiceSettingsRef.current) {
+        //   speakCommentary(msg.text, voiceSettingsRef.current);
+        // }
       }),
 
       room.onMessage("emoji_reaction", (event: EmojiEvent) => {
@@ -187,30 +187,31 @@ export const CommunicationHub: React.FC<Props> = ({
       }),
 
       room.onMessage("ai_overlay", (_overlay: any) => {
-        // Overlay removed — no-op handler kept to prevent unhandled message warnings
+        // DISABLED — AI overlay / agentic flow commented out
       }),
 
       room.onMessage(
         "ai_emoji_burst",
-        (data: { emoji: string; target: string }) => {
-          // Fire 5 simultaneous floating emojis
-          for (let i = 0; i < 5; i++) {
-            setTimeout(() => spawnFloatingEmoji(data.emoji), i * 80);
-          }
+        (_data: { emoji: string; target: string }) => {
+          // DISABLED — AI emoji burst commented out
+          // for (let i = 0; i < 5; i++) {
+          //   setTimeout(() => spawnFloatingEmoji(_data.emoji), i * 80);
+          // }
         },
       ),
 
-      room.onMessage("arena_event", (event: ArenaEvent) => {
-        const label = ARENA_EVENT_LABELS[event.type] ?? "";
-        if (label) {
-          setArenaMsg(label);
-          setArenaFlash(true);
-          if (arenaTimerRef.current) clearTimeout(arenaTimerRef.current);
-          arenaTimerRef.current = setTimeout(() => {
-            setArenaFlash(false);
-            setArenaMsg("");
-          }, 4000);
-        }
+      room.onMessage("arena_event", (_event: ArenaEvent) => {
+        // DISABLED — Arena events from AI commented out
+        // const label = ARENA_EVENT_LABELS[_event.type] ?? "";
+        // if (label) {
+        //   setArenaMsg(label);
+        //   setArenaFlash(true);
+        //   if (arenaTimerRef.current) clearTimeout(arenaTimerRef.current);
+        //   arenaTimerRef.current = setTimeout(() => {
+        //     setArenaFlash(false);
+        //     setArenaMsg("");
+        //   }, 4000);
+        // }
       }),
     ];
 
@@ -393,8 +394,8 @@ export const CommunicationHub: React.FC<Props> = ({
         >
           <MessageCircle size={10} />
           <span>Chat</span>
-          {/* Live voice indicator */}
-          {voiceSettings?.enabled && (
+          {/* Live voice indicator — DISABLED (Sarvam commentary off) */}
+          {/* {voiceSettings?.enabled && (
             <motion.div
               className="ml-auto flex items-center gap-0.5 text-[8px] text-emerald-400 font-display"
               animate={{ opacity: [1, 0.4, 1] }}
@@ -403,7 +404,7 @@ export const CommunicationHub: React.FC<Props> = ({
               <Mic size={8} />
               <span>LIVE</span>
             </motion.div>
-          )}
+          )} */}
         </div>
         <div
           className="flex-1 overflow-y-auto flex flex-col gap-0.5 pr-0.5"

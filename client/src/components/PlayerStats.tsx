@@ -260,7 +260,9 @@ export const PlayerStats: React.FC<PlayerStatsProps> = ({
           </div>
           <div className="space-y-1">
             {recentMatches.slice(0, 4).map((m, i) => {
-              const isWin = m.winnerId === localStorage.getItem("playerId");
+              const myId = localStorage.getItem("playerId");
+              const isWin = m.winnerId === myId;
+              const isDraw = m.isDraw;
               return (
                 <motion.div
                   key={i}
@@ -275,27 +277,37 @@ export const PlayerStats: React.FC<PlayerStatsProps> = ({
                 >
                   <div
                     className={`w-5 h-5 flex items-center justify-center font-display text-[9px] text-white border ${
-                      isWin
-                        ? "bg-green-500 border-green-700"
-                        : "bg-red-500 border-red-700"
+                      isDraw
+                        ? "bg-slate-400 border-slate-600"
+                        : isWin
+                          ? "bg-green-500 border-green-700"
+                          : "bg-red-500 border-red-700"
                     }`}
                   >
-                    {isWin ? "W" : "L"}
+                    {isDraw ? "D" : isWin ? "W" : "L"}
                   </div>
                   <span
-                    className={`font-display text-[10px] flex-1 ${
+                    className={`font-display text-[10px] flex-1 truncate ${
                       nightMode ? "text-slate-300" : "text-slate-700"
                     }`}
                   >
-                    {m.winnerName || "Draw"}
+                    {isDraw
+                      ? "Draw"
+                      : isWin
+                        ? `🏆 Victory`
+                        : `vs ${m.winnerName || "Unknown"}`}
                   </span>
                   <span
-                    className={`font-body text-[11px] ${nightMode ? "text-slate-500" : "text-slate-400"}`}
+                    className={`font-body text-[11px] ${
+                      nightMode ? "text-slate-500" : "text-slate-400"
+                    }`}
                   >
                     {m.playerCount}P
                   </span>
                   <span
-                    className={`font-body text-[10px] ${nightMode ? "text-slate-600" : "text-slate-300"}`}
+                    className={`font-body text-[10px] ${
+                      nightMode ? "text-slate-600" : "text-slate-300"
+                    }`}
                   >
                     {Math.round(m.matchDuration)}s
                   </span>

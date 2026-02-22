@@ -41,63 +41,51 @@ Optional UI:
 
 client/
 
-├── games/
-│   ├── arena-brawl/
-│   │     ├── ArenaScene.ts
-│   │     ├── physics.ts
-│   │     ├── input.ts
-│   │     └── score.ts
+├── src/
+│   ├── games/
+│   │   ├── grass-collect/      (Currently Active)
+│   │   │     ├── GameArena.tsx (Canvas-based rendering)
+│   │   │     └── constants.ts
+│   │   │
+│   │   └── hot-dynamite/       (Planned)
+│   │         ├── ArenaLogic.ts
 │   │
-│   ├── trap-runner/
-│   │     ├── RunnerScene.ts
+│   ├── components/
+│   │   ├── Lobby.tsx           (Multiplayer Room Selection)
+│   │   ├── Leaderboard.tsx     (Global & Match History)
+│   │   └── PlayerStats.tsx     (Browser-persistent stats)
 │   │
-│   └── chaos-tiles/
-│         ├── TilesScene.ts
-│
-├── core/
-│   ├── network.ts
-│   ├── stateSync.ts
-│   ├── prediction.ts
-│   ├── reconciliation.ts
-│   └── interpolation.ts
-│
-├── ui/
-│   ├── Lobby.tsx
-│   ├── Room.tsx
-│   ├── Leaderboard.tsx
-│   └── HUD.tsx
-│
-└── main.tsx
+│   ├── services/
+│   │   └── gameClient.ts       (Colyseus networking & Ngrok bypass)
+│   │
+│   └── App.tsx                 (Entry point & Identity management)
 
-Each game is isolated and self-contained.
-Core handles networking logic shared across games.
+Each game mode is a self-contained logic within `GameArena.tsx` or a modular sub-folder.
+The current implementation uses a Canvas-based HUD-less approach with Framer Motion UI overlays.
 
 ---
 
 # 4️⃣ Core Architecture Layers
 
-## A️⃣ Rendering Layer (KAPLAY)
+## A️⃣ Rendering Layer (HTML5 Canvas)
 
 Responsible for:
 
-- Player sprites
-- Arena obstacles
-- Particle effects
-- Camera
-- Physics visuals
+- Player characters (Pixel art SVG/Base64)
+- Arena objects (Grass, Dynamite, Explosions)
+- Particle systems for VFX
+- Smooth interpolation (client-side prediction)
+- Viewport scaling (Fixed 800x600 logical arena)
 
-Each game registers its own scene:
+## B️⃣ Networking Layer (Colyseus)
 
-kaplay.scene("arena", ArenaScene)
-kaplay.scene("runner", RunnerScene)
+Managed via:
+`client/src/services/gameClient.ts`
 
-Only one scene active at a time.
-
----
-
-## B️⃣ Networking Layer
-
-Located in:
+- Room creation (`arcade`)
+- State synchronization (Players, Grass, Scores)
+- Ngrok bypass headers for external access
+- Unique `playerId` persistence via LocalStorage
 
 core/network.ts
 

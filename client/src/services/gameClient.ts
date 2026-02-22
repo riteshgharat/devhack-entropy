@@ -50,6 +50,18 @@ export class GameClient {
     }
   }
 
+  /** Join a new room by ID without leaving the current one (caller handles old room) */
+  async joinNew(roomId: string, options: any = {}) {
+    try {
+      const newRoom = await this.client.joinById(roomId, { ...options, headers: this.getHeaders() });
+      this.room = newRoom;
+      return newRoom;
+    } catch (error) {
+      console.error("Failed to join new room:", error);
+      throw error;
+    }
+  }
+
   async reconnect(reconnectionToken: string) {
     try {
       this.room = await this.client.reconnect(reconnectionToken);
@@ -74,6 +86,12 @@ export class GameClient {
   sendMove(dx: number, dy: number) {
     if (this.room) {
       this.room.send("move", { dx, dy });
+    }
+  }
+
+  sendUpdateName(name: string) {
+    if (this.room) {
+      this.room.send("updateName", name);
     }
   }
 }

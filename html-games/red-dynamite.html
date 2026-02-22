@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hot Dynamite Arena</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #4fc3f7; /* Water background */
+            font-family: 'Courier New', Courier, monospace;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+        }
+        .score-box {
+            background: rgba(0, 0, 0, 0.7);
+            border: 4px solid;
+            padding: 10px 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 8px;
+            text-shadow: 2px 2px 0 #000;
+            transition: transform 0.1s;
+        }
+        .eliminated {
+            opacity: 0.5;
+            text-decoration: line-through;
+            filter: grayscale(100%);
+        }
+        #timer-box {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            border: 4px solid #f44336;
+            padding: 10px 30px;
+            color: #ffeb3b;
+            font-size: 40px;
+            font-weight: bold;
+            border-radius: 8px;
+            text-shadow: 3px 3px 0 #b71c1c;
+            transition: transform 0.1s;
+        }
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            pointer-events: auto;
+            z-index: 10;
+        }
+        h1 { font-size: 64px; text-shadow: 4px 4px 0 #e53935; margin-bottom: 10px; text-align: center; }
+        p { font-size: 20px; margin-bottom: 30px; text-align: center; max-width: 650px; line-height: 1.5; }
+        button {
+            background: #e53935;
+            border: 4px solid #b71c1c;
+            color: white;
+            font-size: 32px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            padding: 15px 40px;
+            cursor: pointer;
+            box-shadow: 0 8px 0 #b71c1c;
+            transition: transform 0.1s, box-shadow 0.1s;
+            border-radius: 8px;
+        }
+        button:active {
+            transform: translateY(8px);
+            box-shadow: 0 0px 0 #b71c1c;
+        }
+        
+        #score-p1 { border-color: #e53935; color: #ffcdd2; }
+        #score-p2 { border-color: #43a047; color: #c8e6c9; }
+        #score-p3 { border-color: #fdd835; color: #fff9c4; }
+        #score-p4 { border-color: #1e88e5; color: #bbdefb; }
+
+        .hidden { display: none !important; }
+        
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            pointer-events: auto;
+        }
+        #joystick-knob {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            top: 50px;
+            left: 50px;
+        }
+        @media (max-width: 768px) {
+            #mobile-controls { display: block; }
+            .score-box { font-size: 16px; padding: 5px 10px; }
+            #timer-box { font-size: 30px; top: 10px; }
+            h1 { font-size: 40px; }
+            p { font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div id="timer-box">0.0</div>
+        <div class="hud-row">
+            <div id="score-p2" class="score-box">P2: ALIVE</div>
+            <div id="score-p3" class="score-box">P3: ALIVE</div>
+        </div>
+        <div class="hud-row" style="align-items: flex-end;">
+            <div id="score-p1" class="score-box">P1(You): ALIVE</div>
+            <div id="score-p4" class="score-box">P4: ALIVE</div>
+        </div>
+    </div>
+
+    <!-- Mobile Joystick -->
+    <div id="mobile-controls">
+        <div id="joystick-knob"></div>
+    </div>
+
+    <div id="overlay">
+        <h1 id="overlay-title">HOT DYNAMITE</h1>
+        <p id="overlay-desc">
+            Use <b>W, A, S, D</b> or <b>Arrow Keys</b> to move.<br>
+            If you have the <b>Dynamite</b>, bump into others to pass it before time runs out! Last one standing wins.
+        </p>
+        <button id="start-btn">PLAY</button>
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    
+    // UI Elements
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('start-btn');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayDesc = document.getElementById('overlay-desc');
+    const timerEl = document.getElementById('timer-box');
+    const scoreEls = [
+        document.getElementById('score-p1'),
+        document.getElementById('score-p2'),
+        document.getElementById('score-p3'),
+        document.getElementById('score-p4')
+    ];
+
+    // Mobile joystick logic
+    const joystickArea = document.getElementById('mobile-controls');
+    const joystickKnob = document.getElementById('joystick-knob');
+    let joystickActive = false;
+    let joystickVec = { x: 0, y: 0 };
+
+    joystickArea.addEventListener('touchstart', handleJoystickStart, {passive: false});
+    joystickArea.addEventListener('touchmove', handleJoystickMove, {passive: false});
+    joystickArea.addEventListener('touchend', handleJoystickEnd);
+    joystickArea.addEventListener('touchcancel', handleJoystickEnd);
+
+    function handleJoystickStart(e) { e.preventDefault(); joystickActive = true; updateJoystick(e.touches[0]); }
+    function handleJoystickMove(e) { if(!joystickActive) return; e.preventDefault(); updateJoystick(e.touches[0]); }
+    function handleJoystickEnd() { joystickActive = false; joystickVec = { x: 0, y: 0 }; joystickKnob.style.transform = `translate(0px, 0px)`; }
+    function updateJoystick(touch) {
+        const rect = joystickArea.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        let dx = touch.clientX - centerX;
+        let dy = touch.clientY - centerY;
+        const maxDist = rect.width / 2;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
+        joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        joystickVec.x = dx / maxDist; joystickVec.y = dy / maxDist;
+    }
+
+    // Game Constants & Variables
+    const TILE_SIZE = 40;
+    let cx, cy, islandRadius;
+    let trees = [];
+    let entities = [];
+    let particles = [];
+    let explosions = [];
+    let burnMarks = [];
+    
+    let gameState = 'menu';
+    let roundState = 'playing'; // playing, explosionDelay, starting
+    let currentDynamiteTimer = 0;
+    let roundDelay = 0;
+    let maxTimer = 15; // Starts at 15s, gets shorter
+    
+    let lastTime = 0;
+    let accumulator = 0;
+    const TIME_STEP = 1000 / 60;
+
+    // Colors
+    const PALETTE = {
+        water: '#4fc3f7',
+        waterDark: '#29b6f6',
+        sand: '#ffe082',
+        sandDark: '#ffd54f',
+        treeTrunk: '#795548',
+        treeLeaf: '#4CAF50',
+        p1: '#e53935', p2: '#43a047', p3: '#fdd835', p4: '#1e88e5'
+    };
+
+    // Input Handling
+    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+    window.addEventListener('keydown', e => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+    window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        ctx.imageSmoothingEnabled = false;
+        cx = canvas.width / 2;
+        cy = canvas.height / 2;
+        islandRadius = Math.min(cx, cy) * 0.85;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Classes
+    class Entity {
+        constructor(x, y, color, isPlayer = false, id = 0) {
+            this.x = x;
+            this.y = y;
+            this.vx = 0;
+            this.vy = 0;
+            this.baseSpeed = 230; 
+            this.color = color;
+            this.size = TILE_SIZE * 0.8;
+            this.isPlayer = isPlayer;
+            this.id = id;
+            this.facingX = 1;
+            
+            this.isAlive = true;
+            this.hasDynamite = false;
+            this.passCooldown = 0;
+        }
+
+        update(dt) {
+            if (!this.isAlive) return;
+
+            if (this.passCooldown > 0) this.passCooldown -= dt;
+
+            // Holder gets a speed boost to make catching possible
+            let currentSpeed = this.baseSpeed * (this.hasDynamite ? 1.20 : 1.0);
+
+            if (this.isPlayer) {
+                this.handlePlayerInput();
+            } else {
+                this.handleAI(dt);
+            }
+
+            // Normalize velocity
+            let mag = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+            if (mag > 0) {
+                this.vx = (this.vx / mag) * currentSpeed;
+                this.vy = (this.vy / mag) * currentSpeed;
+                this.facingX = this.vx > 0 ? 1 : -1;
+            } else {
+                this.vx = 0; this.vy = 0;
+            }
+
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+
+            this.checkCollisions();
+        }
+
+        handlePlayerInput() {
+            this.vx = 0; this.vy = 0;
+            if (keys.w || keys.ArrowUp) this.vy -= 1;
+            if (keys.s || keys.ArrowDown) this.vy += 1;
+            if (keys.a || keys.ArrowLeft) this.vx -= 1;
+            if (keys.d || keys.ArrowRight) this.vx += 1;
+            if (joystickActive) { this.vx = joystickVec.x; this.vy = joystickVec.y; }
+        }
+
+        handleAI(dt) {
+            this.vx = 0; this.vy = 0;
+            let holder = entities.find(e => e.hasDynamite && e.isAlive);
+            
+            if (this.hasDynamite) {
+                // Chase nearest alive player
+                let minDist = Infinity;
+                let target = null;
+                entities.forEach(e => {
+                    if (e !== this && e.isAlive) {
+                        let d = Math.hypot(e.x - this.x, e.y - this.y);
+                        if (d < minDist) { minDist = d; target = e; }
+                    }
+                });
+                
+                if (target) {
+                    this.vx = target.x - this.x;
+                    this.vy = target.y - this.y;
+                    
+                    // Minor tree avoidance to not get hard stuck
+                    trees.forEach(t => {
+                        let dTree = Math.hypot(this.x - t.x, this.y - t.y);
+                        if (dTree < t.radius + 30) {
+                            this.vx += (this.x - t.x) * 2;
+                            this.vy += (this.y - t.y) * 2;
+                        }
+                    });
+                }
+            } else if (holder) {
+                // Flee from holder
+                let dx = this.x - holder.x;
+                let dy = this.y - holder.y;
+                let distToHolder = Math.hypot(dx, dy);
+                
+                // Base flee vector
+                if (distToHolder > 0) {
+                    this.vx = dx;
+                    this.vy = dy;
+                }
+
+                // If getting near edge, steer heavily towards center so they don't get trapped on walls
+                let distToCenter = Math.hypot(this.x - cx, this.y - cy);
+                let edgeBuffer = islandRadius - 100;
+                if (distToCenter > edgeBuffer) {
+                    let pull = (distToCenter - edgeBuffer) / 20; // Increases as it gets closer to edge
+                    this.vx += (cx - this.x) * pull;
+                    this.vy += (cy - this.y) * pull;
+                }
+
+                // Steer away from trees
+                trees.forEach(t => {
+                    let dTree = Math.hypot(this.x - t.x, this.y - t.y);
+                    if (dTree < t.radius + 80) {
+                        this.vx += (this.x - t.x) * 2.5;
+                        this.vy += (this.y - t.y) * 2.5;
+                    }
+                });
+            }
+        }
+
+        checkCollisions() {
+            // Island Boundary (Circle)
+            let distToCenter = Math.hypot(this.x - cx, this.y - cy);
+            if (distToCenter > islandRadius - this.size/2) {
+                let angle = Math.atan2(this.y - cy, this.x - cx);
+                this.x = cx + Math.cos(angle) * (islandRadius - this.size/2);
+                this.y = cy + Math.sin(angle) * (islandRadius - this.size/2);
+            }
+
+            // Trees (Circle)
+            trees.forEach(t => {
+                let dTree = Math.hypot(this.x - t.x, this.y - t.y);
+                let minDist = t.radius + this.size/2;
+                if (dTree < minDist) {
+                    let angle = Math.atan2(this.y - t.y, this.x - t.x);
+                    this.x = t.x + Math.cos(angle) * minDist;
+                    this.y = t.y + Math.sin(angle) * minDist;
+                }
+            });
+        }
+
+        draw(ctx) {
+            if (!this.isAlive) return;
+
+            ctx.fillStyle = this.color;
+            const s = this.size;
+            
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            
+            let wiggleY = (this.vx !== 0 || this.vy !== 0) ? Math.sin(Date.now() / 50) * 3 : 0;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(-s/2 + 2, -s/2 + 5 + s, s, s*0.2);
+
+            // Body
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-s/2, -s/2 + wiggleY, s, s * 0.8);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fillRect(-s/2, -s/2 + wiggleY, s, s*0.2);
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.fillRect(-s/2, -s/2 + wiggleY + s*0.6, s, s*0.2);
+
+            // Eyes
+            ctx.fillStyle = 'white';
+            const eyeOffX = this.facingX * (s*0.1);
+            
+            // If they have dynamite, make them look panicked/angry
+            if (this.hasDynamite) {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-s/4 + eyeOffX, -s/4 + wiggleY, s*0.2, s*0.2);
+                ctx.fillRect(s/8 + eyeOffX, -s/4 + wiggleY, s*0.2, s*0.2);
+                
+                // Angry eyebrows
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.moveTo(-s/4 + eyeOffX - 2, -s/4 + wiggleY - 2);
+                ctx.lineTo(-s/4 + eyeOffX + s*0.2 + 2, -s/4 + wiggleY + 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(s/8 + eyeOffX + s*0.2 + 2, -s/4 + wiggleY - 2);
+                ctx.lineTo(s/8 + eyeOffX - 2, -s/4 + wiggleY + 2);
+                ctx.stroke();
+
+                ctx.fillStyle = 'black';
+                ctx.fillRect(-s/4 + s*0.1 + eyeOffX, -s/4 + s*0.1 + wiggleY, s*0.1, s*0.1);
+                ctx.fillRect(s/8 + s*0.1 + eyeOffX, -s/4 + s*0.1 + wiggleY, s*0.1, s*0.1);
+            } else {
+                ctx.fillRect(-s/4 + eyeOffX, -s/4 + wiggleY, s*0.2, s*0.2);
+                ctx.fillRect(s/8 + eyeOffX, -s/4 + wiggleY, s*0.2, s*0.2);
+                ctx.fillStyle = 'black';
+                ctx.fillRect(-s/4 + s*0.1 + eyeOffX, -s/4 + s*0.1 + wiggleY, s*0.1, s*0.1);
+                ctx.fillRect(s/8 + s*0.1 + eyeOffX, -s/4 + s*0.1 + wiggleY, s*0.1, s*0.1);
+            }
+
+            // Draw Dynamite above head
+            if (this.hasDynamite) {
+                let isFlashing = currentDynamiteTimer < 3 && (Math.floor(Date.now() / 100) % 2 === 0);
+                this.drawDynamite(0, -s - 5 + wiggleY, isFlashing);
+            }
+
+            ctx.restore();
+        }
+
+        drawDynamite(dx, dy, flash) {
+            ctx.save();
+            ctx.translate(dx, dy);
+            // Sticks
+            ctx.fillStyle = flash ? '#fff' : '#e53935';
+            ctx.fillRect(-10, -15, 6, 20);
+            ctx.fillRect(-3, -15, 6, 20);
+            ctx.fillRect(4, -15, 6, 20);
+            // Bands
+            ctx.fillStyle = '#222';
+            ctx.fillRect(-10, -10, 20, 2);
+            ctx.fillRect(-10, 0, 20, 2);
+            // Fuse
+            ctx.fillStyle = '#795548';
+            ctx.fillRect(-1, -20, 2, 5);
+            // Spark
+            ctx.fillStyle = (Math.random() > 0.5) ? '#ffeb3b' : '#ff9800';
+            ctx.beginPath();
+            ctx.arc(0, -22, 3 + Math.random()*3, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color1, color2, velMod = 100) {
+            this.x = x + (Math.random() - 0.5) * 10;
+            this.y = y + (Math.random() - 0.5) * 10;
+            this.vx = (Math.random() - 0.5) * velMod * 2;
+            this.vy = (Math.random() - 0.5) * velMod * 2;
+            this.life = 1.0;
+            this.decay = 1.5 + Math.random();
+            this.size = 4 + Math.random() * 6;
+            this.color = Math.random() > 0.5 ? color1 : color2;
+        }
+        update(dt) {
+            this.x += this.vx * dt;
+            this.y += this.vy * dt;
+            this.life -= this.decay * dt;
+        }
+        draw(ctx) {
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = Math.max(0, this.life);
+            ctx.fillRect(this.x, this.y, this.size, this.size);
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    function spawnParticles(x, y, c1, c2, count, vel = 100) {
+        for(let i=0; i<count; i++) particles.push(new Particle(x, y, c1, c2, vel));
+    }
+
+    // Initialization
+    function initGame() {
+        resize();
+        
+        trees = [];
+        // Generate Trees around the island
+        let treeCount = 5 + Math.floor(Math.random() * 3);
+        for(let i=0; i<treeCount; i++) {
+            let angle = (i / treeCount) * Math.PI * 2 + Math.random();
+            let dist = islandRadius * 0.4 + Math.random() * (islandRadius * 0.3);
+            trees.push({
+                x: cx + Math.cos(angle) * dist,
+                y: cy + Math.sin(angle) * dist,
+                radius: 20
+            });
+        }
+
+        entities = [];
+        particles = [];
+        explosions = [];
+        burnMarks = [];
+
+        // Spawn players in a circle
+        for(let i=0; i<4; i++) {
+            let angle = (i / 4) * Math.PI * 2 + Math.PI/4;
+            let spawnRadius = islandRadius * 0.7;
+            let c = [PALETTE.p1, PALETTE.p2, PALETTE.p3, PALETTE.p4][i];
+            entities.push(new Entity(cx + Math.cos(angle) * spawnRadius, cy + Math.sin(angle) * spawnRadius, c, i===0, i));
+        }
+
+        maxTimer = 15;
+        updateUI();
+        startRound();
+        
+        gameState = 'playing';
+        overlay.classList.add('hidden');
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function startRound() {
+        // Find alive players
+        let alive = entities.filter(e => e.isAlive);
+        if (alive.length <= 1) {
+            endGame(alive[0]);
+            return;
+        }
+
+        // Assign dynamite randomly
+        alive.forEach(e => e.hasDynamite = false);
+        let randomPlayer = alive[Math.floor(Math.random() * alive.length)];
+        randomPlayer.hasDynamite = true;
+        
+        // Ensure they can't instantly pass it if they spawn on someone
+        alive.forEach(e => e.passCooldown = 1.0);
+
+        currentDynamiteTimer = maxTimer;
+        roundState = 'playing';
+        timerEl.style.transform = 'translateX(-50%) scale(1.5)';
+        timerEl.style.color = '#fff';
+        setTimeout(() => timerEl.style.transform = 'translateX(-50%) scale(1)', 300);
+    }
+
+    function triggerExplosion() {
+        roundState = 'explosionDelay';
+        roundDelay = 2.0; // Wait 2 seconds before next round
+        
+        let holder = entities.find(e => e.hasDynamite && e.isAlive);
+        if (holder) {
+            holder.isAlive = false;
+            holder.hasDynamite = false;
+            
+            // Explosion effects
+            explosions.push({x: holder.x, y: holder.y, radius: 0, maxRadius: TILE_SIZE * 3, life: 1});
+            spawnParticles(holder.x, holder.y, '#ff9800', '#f44336', 150, 300);
+            burnMarks.push({x: holder.x, y: holder.y});
+
+            // Make timer say BOOM
+            timerEl.innerText = "BOOM!";
+            timerEl.style.color = '#f44336';
+            timerEl.style.transform = 'translateX(-50%) scale(2)';
+            
+            updateUI();
+        }
+        
+        // Make next round faster
+        maxTimer = Math.max(5, maxTimer - 3); 
+    }
+
+    function updateUI() {
+        entities.forEach(e => {
+            let el = scoreEls[e.id];
+            if (e.isAlive) {
+                el.classList.remove('eliminated');
+                el.innerText = `P${e.id + 1}${e.id===0 ? '(You)' : ''}: ALIVE`;
+            } else {
+                el.classList.add('eliminated');
+                el.innerText = `P${e.id + 1}: ELIMINATED`;
+            }
+        });
+    }
+
+    function endGame(winner) {
+        gameState = 'end';
+        
+        let title = "";
+        let desc = "";
+        
+        if (winner && winner.id === 0) {
+            title = "YOU SURVIVED!";
+            desc = `You are the last one standing! Excellent dodging.`;
+            overlayTitle.style.textShadow = "4px 4px 0 " + PALETTE.p1;
+        } else {
+            let botColors = ["", "Green", "Yellow", "Blue"];
+            title = "ELIMINATED!";
+            if (winner) {
+                desc = `The ${botColors[winner.id]} bot survived the explosions.`;
+                let wColor = [PALETTE.p1, PALETTE.p2, PALETTE.p3, PALETTE.p4][winner.id];
+                overlayTitle.style.textShadow = "4px 4px 0 " + wColor;
+            } else {
+                desc = `Everyone blew up! Draw.`;
+                overlayTitle.style.textShadow = "4px 4px 0 #fff";
+            }
+        }
+
+        overlayTitle.innerText = title;
+        overlayDesc.innerHTML = desc;
+        startBtn.innerText = "PLAY AGAIN";
+        overlay.classList.remove('hidden');
+    }
+
+    // Main Loop
+    function update(dt) {
+        if (gameState !== 'playing') return;
+
+        if (roundState === 'playing') {
+            currentDynamiteTimer -= dt;
+            
+            // UI Update
+            timerEl.innerText = Math.max(0, currentDynamiteTimer).toFixed(1);
+            if (currentDynamiteTimer < 3) {
+                timerEl.style.color = (Math.floor(currentDynamiteTimer * 10) % 2 === 0) ? '#f44336' : '#fff';
+            } else {
+                timerEl.style.color = '#ffeb3b';
+                timerEl.style.transform = 'translateX(-50%) scale(1)';
+            }
+
+            if (currentDynamiteTimer <= 0) {
+                triggerExplosion();
+            }
+
+            // Player-Player Collisions (Pass Dynamite & Push)
+            for (let i = 0; i < entities.length; i++) {
+                for (let j = i + 1; j < entities.length; j++) {
+                    let e1 = entities[i];
+                    let e2 = entities[j];
+                    if (!e1.isAlive || !e2.isAlive) continue;
+
+                    let dx = e1.x - e2.x;
+                    let dy = e1.y - e2.y;
+                    let dist = Math.hypot(dx, dy);
+                    let minDist = e1.size/2 + e2.size/2;
+
+                    if (dist < minDist) {
+                        // Pass dynamite logic
+                        if (e1.hasDynamite && !e2.hasDynamite && e1.passCooldown <= 0 && e2.passCooldown <= 0) {
+                            e1.hasDynamite = false; e2.hasDynamite = true;
+                            e1.passCooldown = 0.5; e2.passCooldown = 0.5;
+                            spawnParticles(e2.x, e2.y, '#f44336', '#ffeb3b', 15);
+                            timerEl.style.transform = 'translateX(-50%) scale(1.2)';
+                            setTimeout(() => timerEl.style.transform = 'translateX(-50%) scale(1)', 100);
+                        } else if (e2.hasDynamite && !e1.hasDynamite && e1.passCooldown <= 0 && e2.passCooldown <= 0) {
+                            e2.hasDynamite = false; e1.hasDynamite = true;
+                            e1.passCooldown = 0.5; e2.passCooldown = 0.5;
+                            spawnParticles(e1.x, e1.y, '#f44336', '#ffeb3b', 15);
+                            timerEl.style.transform = 'translateX(-50%) scale(1.2)';
+                            setTimeout(() => timerEl.style.transform = 'translateX(-50%) scale(1)', 100);
+                        }
+
+                        // Soft push apart to prevent stacking
+                        if (dist === 0) { dx = 1; dy = 0; dist = 1; } 
+                        let push = (minDist - dist) * 0.5; // Soften the push
+                        let px = (dx / dist) * push;
+                        let py = (dy / dist) * push;
+                        e1.x += px; e1.y += py;
+                        e2.x -= px; e2.y -= py;
+                    }
+                }
+            }
+        } else if (roundState === 'explosionDelay') {
+            roundDelay -= dt;
+            if (roundDelay <= 0) {
+                startRound();
+            }
+        }
+
+        entities.forEach(e => e.update(dt));
+        
+        explosions.forEach(ex => {
+            ex.radius += dt * 500;
+            ex.life -= dt * 2;
+        });
+        explosions = explosions.filter(ex => ex.life > 0);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update(dt);
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function draw() {
+        // Draw Water
+        ctx.fillStyle = PALETTE.water;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Simple water ripples
+        ctx.fillStyle = PALETTE.waterDark;
+        let t = Date.now() / 1000;
+        for(let i=0; i<30; i++) {
+            let rx = (Math.sin(t + i) * 0.5 + 0.5) * canvas.width;
+            let ry = (i / 30) * canvas.height;
+            ctx.fillRect(rx, ry, 40, 4);
+        }
+
+        // Draw Island Border
+        ctx.fillStyle = PALETTE.sandDark;
+        ctx.beginPath();
+        ctx.arc(cx, cy, islandRadius + 8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Island Sand
+        ctx.fillStyle = PALETTE.sand;
+        ctx.beginPath();
+        ctx.arc(cx, cy, islandRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw Burn Marks
+        burnMarks.forEach(bm => {
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.arc(bm.x, bm.y, 30, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        // Draw Trees
+        trees.forEach(t => {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath(); ctx.arc(t.x + 5, t.y + 10, t.radius, 0, Math.PI*2); ctx.fill();
+            
+            // Trunk
+            ctx.fillStyle = PALETTE.treeTrunk;
+            ctx.fillRect(t.x - 6, t.y - t.radius, 12, t.radius + 10);
+            
+            // Leaves (Pixelated approach)
+            ctx.fillStyle = PALETTE.treeLeaf;
+            for(let a=0; a<Math.PI*2; a += Math.PI/3) {
+                let lx = t.x + Math.cos(a) * 15;
+                let ly = t.y - t.radius + Math.sin(a) * 15;
+                ctx.fillRect(lx - 12, ly - 12, 24, 24);
+            }
+            // Leaf highlights
+            ctx.fillStyle = '#81C784';
+            ctx.fillRect(t.x - 8, t.y - t.radius - 15, 16, 16);
+        });
+
+        // Draw Mine Explosions
+        explosions.forEach(ex => {
+            ctx.fillStyle = `rgba(255, 87, 34, ${ex.life})`;
+            ctx.beginPath();
+            ctx.arc(ex.x, ex.y, ex.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = `rgba(255, 235, 59, ${ex.life})`;
+            ctx.beginPath();
+            ctx.arc(ex.x, ex.y, ex.radius * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Draw Particles
+        particles.forEach(p => p.draw(ctx));
+
+        // Draw Entities (sort by Y)
+        entities.sort((a, b) => a.y - b.y);
+        entities.forEach(e => e.draw(ctx));
+    }
+
+    function gameLoop(timestamp) {
+        if (gameState !== 'playing') return;
+        let dt = timestamp - lastTime;
+        lastTime = timestamp;
+        if (dt > 100) dt = 100;
+        accumulator += dt;
+
+        while (accumulator >= TIME_STEP) {
+            update(TIME_STEP / 1000); 
+            accumulator -= TIME_STEP;
+        }
+
+        draw();
+        requestAnimationFrame(gameLoop);
+    }
+
+    startBtn.addEventListener('click', initGame);
+
+    // Initial background draw
+    resize();
+    ctx.fillStyle = PALETTE.water;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = PALETTE.sandDark;
+    ctx.beginPath(); ctx.arc(cx, cy, islandRadius + 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = PALETTE.sand;
+    ctx.beginPath(); ctx.arc(cx, cy, islandRadius, 0, Math.PI * 2); ctx.fill();
+
+</script>
+</body>
+</html>

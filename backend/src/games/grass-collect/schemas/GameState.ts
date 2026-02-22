@@ -1,13 +1,16 @@
 import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
 import { PlayerState } from "./PlayerState";
-import { GrassState } from "./GrassState";
+import { ItemState } from "./GrassState";
 
 export class GameState extends Schema {
   /** Map of sessionId → PlayerState */
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
 
-  /** Active grass elements */
-  @type([GrassState]) grasses = new ArraySchema<GrassState>();
+  /** Active items (mines, boosters) */
+  @type([ItemState]) items = new ArraySchema<ItemState>();
+
+  /** Grid of grass states (0=dirt, 1=cut once, 2=full grass) */
+  @type(["uint8"]) grid = new ArraySchema<number>();
 
   /** Has the match started? */
   @type("boolean") matchStarted: boolean = false;

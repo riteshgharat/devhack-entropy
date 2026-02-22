@@ -9,6 +9,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Settings, Volume2, Monitor, Sun, Moon, User } from 'lucide-react';
 import { PixelCard } from './components/PixelCard';
 import { GameArena } from './components/GameArena';
+import { GrassGame } from './components/games/GrassGame';
+import { RedDynamiteGame } from './components/games/RedDynamiteGame';
+import { TurfSoccerGame } from './components/games/TurfSoccerGame';
 import { gameClient } from './services/gameClient';
 import { Room } from 'colyseus.js';
 
@@ -31,35 +34,120 @@ function App() {
 
   React.useEffect(() => {
     localStorage.setItem('displayName', displayName);
-  }, [displayName]);
+
+    const debounceTimer = setTimeout(async () => {
+      // 1. Sync to active room if exists
+      if (activeRoom) {
+        gameClient.sendUpdateName(displayName);
+      }
+
+      // 2. Sync to backend persistently
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json'
+        };
+        if (import.meta.env.VITE_NGROK === 'true') {
+          headers['ngrok-skip-browser-warning'] = 'true';
+        }
+
+        await fetch(`${backendUrl}/api/player/name`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ playerId, displayName })
+        });
+      } catch (err) {
+        console.error("Failed to sync name to backend", err);
+      }
+    }, 1000);
+
+    return () => clearTimeout(debounceTimer);
+  }, [displayName, activeRoom, playerId]);
 
   React.useEffect(() => {
     localStorage.setItem('playerColor', characterColor);
   }, [characterColor]);
 
-  React.useEffect(() => {
-    const token = sessionStorage.getItem('reconnectionToken');
-    if (token) {
-      gameClient.reconnect(token).then((room) => {
-        setActiveRoom(room);
-        setShowSplash(false);
-      }).catch((err) => {
-        console.error("Failed to reconnect", err);
-        sessionStorage.removeItem('reconnectionToken');
-      });
+  // Cumulative scores across all games in a session
+  const [cumulativeScores, setCumulativeScores] = React.useState<Record<string, { displayName: string; score: number }>>({});
+  const [showFinalLeaderboard, setShowFinalLeaderboard] = React.useState(false);
+
+  // Refs so handleNextGame always reads current values without stale closure
+  const displayNameRef = React.useRef(displayName);
+  displayNameRef.current = displayName;
+  const characterColorRef = React.useRef(characterColor);
+  characterColorRef.current = characterColor;
+  const playerIdRef = React.useRef(playerId);
+
+  // Guards and counters for game transitions
+  const isTransitioningRef = React.useRef(false);
+  const gameCountRef = React.useRef(0); // how many next_game transitions have fired
+
+  // Handle transition to the next game room - called by game components directly
+  const handleNextGame = React.useCallback(async (roomId: string, _roomName: string) => {
+    // Prevent double-execution (safety net on top of the per-room guard in game components)
+    if (isTransitioningRef.current) {
+      console.warn("[App] handleNextGame called while already transitioning — ignored");
+      return;
     }
+    isTransitioningRef.current = true;
+
+    const currentRoom = gameClient.getRoom();
+
+    // Collect scores from the current room before leaving
+    const myScore: number = (currentRoom?.state?.players as any)?.get(currentRoom?.sessionId)?.score ?? 0;
+    const finalScores: Record<string, { displayName: string; score: number }> = {};
+    (currentRoom?.state?.players as any)?.forEach((player: any) => {
+      if (player.playerId) {
+        finalScores[player.playerId] = { displayName: player.displayName, score: player.score ?? 0 };
+      }
+    });
+
+    gameCountRef.current += 1;
+    console.log(`[App] handleNextGame — game #${gameCountRef.current}, myScore: ${myScore}`);
+
+    // After 3 games (arena → dynamite → soccer → final), show the overall leaderboard
+    if (gameCountRef.current >= 3) {
+      setCumulativeScores(finalScores);
+      setShowFinalLeaderboard(true);
+      // Leave the old room immediately so it can dispose and we don't hold stale connections
+      try { currentRoom?.leave(); } catch (_e) { /* ok */ }
+      setActiveRoom(null);
+      isTransitioningRef.current = false;
+      return;
+    }
+
+    try {
+      const newRoom = await gameClient.joinNew(roomId, {
+        displayName: displayNameRef.current,
+        playerId: playerIdRef.current,
+        color: characterColorRef.current,
+        previousScore: myScore,
+      });
+      // Leave the old room after successfully connecting to new one
+      try { currentRoom?.leave(); } catch (_e) { /* ok */ }
+      setActiveRoom(newRoom);
+    } catch (err) {
+      console.error("[App] Failed to join next game room:", err);
+    } finally {
+      isTransitioningRef.current = false;
+    }
+  }, []);
+
+  // Clean up any stale reconnection tokens on mount
+  // (rooms don't support allowReconnection, so tokens are never valid after leave/reload)
+  React.useEffect(() => {
+    sessionStorage.removeItem('reconnectionToken');
   }, []);
 
   const handleJoinRoom = (room: Room) => {
     setActiveRoom(room);
-    sessionStorage.setItem('reconnectionToken', room.reconnectionToken);
     setShowMultiplayer(false);
   };
 
   const handleLeaveRoom = () => {
     gameClient.leave();
     setActiveRoom(null);
-    sessionStorage.removeItem('reconnectionToken');
   };
 
   if (showSplash) {
@@ -72,16 +160,36 @@ function App() {
 
       {activeRoom ? (
         <div className="relative z-10 flex-1">
-          <header className="pt-8 text-center">
+          <header className="pt-8 text-center relative">
             <h1 className={`font-display text-4xl uppercase tracking-tighter ${nightMode ? 'text-indigo-300' : 'text-yellow-400'}`}>
               CHAOS ARENA
             </h1>
+            <div className={`absolute top-8 right-8 font-display text-[10px] px-2 py-1 border-2 opacity-50 ${nightMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+              ROOM: {activeRoom.roomId}
+            </div>
           </header>
-          <GameArena
-            room={activeRoom}
-            nightMode={nightMode}
-            onLeave={handleLeaveRoom}
-          />
+          {activeRoom.name === "red_dynamite_room" ? (
+            <RedDynamiteGame
+              room={activeRoom}
+              nightMode={nightMode}
+              onLeave={handleLeaveRoom}
+              onNextGame={handleNextGame}
+            />
+          ) : activeRoom.name === "turf_soccer_room" ? (
+            <TurfSoccerGame
+              room={activeRoom}
+              nightMode={nightMode}
+              onLeave={handleLeaveRoom}
+              onNextGame={handleNextGame}
+            />
+          ) : (
+            <GrassGame
+              room={activeRoom}
+              nightMode={nightMode}
+              onLeave={handleLeaveRoom}
+              onNextGame={handleNextGame}
+            />
+          )}
         </div>
       ) : (
         <>
@@ -317,6 +425,72 @@ function App() {
           </motion.div>
         </div>
       )}
+
+      {/* Final Leaderboard — shown after both games complete */}
+      <AnimatePresence>
+        {showFinalLeaderboard && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="w-full max-w-md"
+            >
+              <PixelCard title="🏆 FINAL RESULTS" className="mx-4" nightMode={nightMode}>
+                <div className="text-center mb-4">
+                  <p className={`font-body text-base ${nightMode ? 'text-slate-300' : 'text-slate-600'}`}>
+                    All games complete! Final standings:
+                  </p>
+                </div>
+                <div className="space-y-3 mb-6">
+                  {(Object.entries(cumulativeScores) as [string, { displayName: string; score: number }][])
+                    .sort(([, a], [, b]) => b.score - a.score)
+                    .map(([id, data], idx) => (
+                      <div
+                        key={id}
+                        className={`flex items-center justify-between p-3 border-2 ${idx === 0
+                          ? nightMode
+                            ? 'border-yellow-400 bg-yellow-900/30'
+                            : 'border-yellow-500 bg-yellow-50'
+                          : nightMode
+                            ? 'border-slate-600 bg-slate-800/50'
+                            : 'border-slate-200 bg-white'
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`font-display text-xl ${idx === 0 ? 'text-yellow-400' : 'text-slate-400'}`}>
+                            {idx === 0 ? '👑' : `#${idx + 1}`}
+                          </span>
+                          <span className={`font-display text-sm uppercase ${nightMode ? 'text-white' : 'text-slate-800'}`}>
+                            {data.displayName}
+                          </span>
+                        </div>
+                        <span className={`font-display text-lg font-bold ${idx === 0 ? 'text-yellow-400' : nightMode ? 'text-indigo-300' : 'text-green-600'}`}>
+                          {data.score} <span className="text-xs font-normal opacity-70">pts</span>
+                        </span>
+                      </div>
+                    ))}
+                </div>
+                <PixelButton
+                  className="w-full"
+                  onClick={() => {
+                    setShowFinalLeaderboard(false);
+                    setCumulativeScores({});
+                    gameCountRef.current = 0;
+                    isTransitioningRef.current = false;
+                    // Room was already left when the leaderboard was shown,
+                    // so just make sure the client state is clean
+                    try { gameClient.leave(); } catch (_e) { /* ok, may already be null */ }
+                    setActiveRoom(null);
+                  }}
+                >
+                  Play Again
+                </PixelButton>
+              </PixelCard>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

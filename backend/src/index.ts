@@ -6,9 +6,11 @@ dotenv.config();
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./games/grass-collect/rooms/GameRoom";
+import { RedDynamiteRoom } from "./games/red-dynamite/rooms/RedDynamiteRoom";
+import { TurfSoccerRoom } from "./games/turf-soccer/rooms/TurfSoccerRoom";
 import { initRedis } from "./db/redis";
 import { initSQLite } from "./db/sqlite";
-import { getRecentMatches, getLeaderboard, getPlayerStats } from "./db/matchHistory";
+import { getRecentMatches, getLeaderboard, getPlayerStats, updatePlayerName } from "./db/matchHistory";
 
 import cors from "cors";
 
@@ -61,6 +63,21 @@ app.get("/api/player/:id", async (req, res) => {
   }
 });
 
+// Update player name endpoint
+app.post("/api/player/name", async (req, res) => {
+  const { playerId, displayName } = req.body;
+  if (!playerId || !displayName) {
+    return res.status(400).json({ error: "Invalid playerId or displayName" });
+  }
+
+  try {
+    await updatePlayerName(playerId, displayName);
+    res.json({ success: true, displayName });
+  } catch {
+    res.status(500).json({ error: "Failed to update player name" });
+  }
+});
+
 const server = createServer(app);
 
 // ─── Colyseus game server ─────────────────────────────────
@@ -72,6 +89,8 @@ const gameServer = new Server({
 
 // Register game rooms
 gameServer.define("arena_room", GameRoom);
+gameServer.define("red_dynamite_room", RedDynamiteRoom);
+gameServer.define("turf_soccer_room", TurfSoccerRoom);
 
 // ─── Initialize databases (optional, graceful fallback) ───
 initRedis();

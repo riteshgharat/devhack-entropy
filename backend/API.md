@@ -10,19 +10,20 @@
    - [Client → Server Messages](#22-client--server-messages)
    - [Server → Client Messages](#23-server--client-messages)
    - [Synchronized State](#24-synchronized-state)
-3. [Arena Mutations](#3-arena-mutations)
-4. [Database Integration](#4-database-integration)
-   - [SQLite](#41-sqlite)
-   - [Redis](#42-redis)
-   - [Read Strategy](#43-read-strategy)
-5. [Environment Variables](#5-environment-variables)
-6. [Graceful Degradation](#6-graceful-degradation)
+3. [Database Integration](#3-database-integration)
+   - [SQLite](#31-sqlite)
+   - [Redis](#32-redis)
+   - [Read Strategy](#33-read-strategy)
+4. [Environment Variables](#4-environment-variables)
+5. [Graceful Degradation](#5-graceful-degradation)
 
 ---
 
 ## 1. HTTP Endpoints
 
 Base URL: `http://localhost:3000` (dev) or your deployed host.
+
+> **Note on Ngrok:** If accessing the API via ngrok, ensure you include the header `ngrok-skip-browser-warning: true` in your requests to bypass the interstitial warning page.
 
 ---
 
@@ -96,7 +97,7 @@ Returns the top players based on wins and score. Reads from SQLite.
 
 ### `GET /api/player/:id`
 
-Returns the stats for a specific player. Reads from SQLite.
+Returns the stats for a specific player, including their global rank. Rank is calculated by counting players with more wins or the same wins and a higher score. Reads from SQLite.
 
 **Response `200`**
 ```json
@@ -106,7 +107,8 @@ Returns the stats for a specific player. Reads from SQLite.
     "displayName": "PixelKing",
     "matches": 15,
     "wins": 10,
-    "score": 4500
+    "score": 4500,
+    "rank": 3
   }
 }
 ```
@@ -119,6 +121,38 @@ Returns the stats for a specific player. Reads from SQLite.
 **Response `500`**
 ```json
 { "error": "Failed to fetch player stats" }
+```
+
+---
+
+### `POST /api/player/name`
+
+Updates or creates a persistent player record with a new display name. Used for syncing character names across devices.
+
+**Request Body**
+```json
+{
+  "playerId": "id_abc123",
+  "displayName": "NewName"
+}
+```
+
+**Response `200`**
+```json
+{
+  "success": true,
+  "displayName": "NewName"
+}
+```
+
+**Response `400`**
+```json
+{ "error": "Invalid playerId or displayName" }
+```
+
+**Response `500`**
+```json
+{ "error": "Failed to update player name" }
 ```
 
 ---
@@ -173,21 +207,16 @@ Move the player in a direction. Server applies velocity authoritatively.
 
 ---
 
-#### `arena_mutation`
-Trigger an arena mutation. Any connected client can call this (intended for AI Game Master or admin).
+#### `updateName`
+Updates the player's display name for both the current session and persistent storage.
 
-```json
-{ "mutation": "spawn_falling_block" }
+```
+"NewPlayerName" (sent as raw string)
 ```
 
-```json
-{ "mutation": "target_player_trap", "targetSessionId": "<sessionId>" }
-```
-
-| Field | Type | Description |
+| Type | Max Length | Description |
 |---|---|---|
-| `mutation` | `string` | One of the 5 mutation types (see §3) |
-| `targetSessionId` | `string` (optional) | Target a specific player session for `target_player_trap` or `speed_modifier`. Falls back to leader/weakest if omitted. |
+| `string` | 15 characters | The new name to display in the current game room and save to the backend. |
 
 ---
 
@@ -295,27 +324,13 @@ The full game state is automatically synced to all clients via Colyseus `@Schema
 
 ---
 
-## 3. Arena Mutations
-
-Triggered via the `arena_mutation` WebSocket message. All mutations update `state.lastArenaEvent`.
-
-| Mutation | `lastArenaEvent` | Description |
-|---|---|---|
-| `spawn_falling_block` | `"block"` | Spawns a block at the top of the arena that falls downward. Eliminates players on collision. |
-| `shrink_boundary` | `"boundary"` | Reduces `arenaBoundaryX` and `arenaBoundaryY` by a fixed amount. Players outside the new boundary are eliminated. |
-| `rotate_obstacle` | `"rotate"` | Spawns a rotating obstacle hazard at a random position. Players colliding with it are eliminated. |
-| `speed_modifier` | `"speed"` | Creates a speed zone (slow/fast area) near the weakest player or `targetSessionId`. |
-| `target_player_trap` | `"trap"` | Spawns a trap at the targeted player's current position. Defaults to the current leader if no `targetSessionId` is given. |
-
----
-
-## 4. Database Integration
+## 3. Database Integration
 
 Both databases are **optional**. The game server runs fully without them.
 
 ---
 
-### 4.1 SQLite
+### 3.1 SQLite
 
 **Driver:** [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — synchronous, zero-config, embedded.
 
@@ -359,7 +374,7 @@ INSERT INTO match_history (room_id, winner_id, winner_name, player_count, match_
 VALUES (?, ?, ?, ?, ?, ?)
 ```
 
-**Write — `savePlayerStats()`**: Called automatically at the end of every match for all players.
+**Write — `savePlayerStats()`**: Called at the end of every match for all participants.
 
 ```sql
 INSERT INTO players (id, display_name, matches, wins, score)
@@ -369,6 +384,15 @@ ON CONFLICT(id) DO UPDATE SET
   matches = matches + 1,
   wins = wins + excluded.wins,
   score = score + excluded.score
+```
+
+**Write — `updatePlayerName()`**: Updates player name persistently.
+
+```sql
+INSERT INTO players (id, display_name, matches, wins, score)
+VALUES (?, ?, 0, 0, 0)
+ON CONFLICT(id) DO UPDATE SET
+  display_name = excluded.display_name
 ```
 
 **Read — `getRecentMatches(limit)`**: Used by `GET /api/matches`. Returns rows ordered by `created_at DESC`.
@@ -399,7 +423,7 @@ WHERE id = ?
 
 ---
 
-### 4.2 Redis
+### 3.2 Redis
 
 **Client:** [ioredis](https://github.com/redis/ioredis)
 
@@ -428,7 +452,7 @@ LRANGE chaos:match_history 0 <limit-1>
 
 ---
 
-### 4.3 Read Strategy
+### 3.3 Read Strategy
 
 `getRecentMatches()` uses a **Redis-first, SQLite-fallback** strategy:
 
@@ -444,7 +468,7 @@ LRANGE chaos:match_history 0 <limit-1>
 
 ---
 
-## 5. Environment Variables
+## 4. Environment Variables
 
 | Variable | Default | Description |
 |---|---|---|
@@ -457,7 +481,7 @@ LRANGE chaos:match_history 0 <limit-1>
 
 ---
 
-## 6. Graceful Degradation
+## 5. Graceful Degradation
 
 Both databases are initialized at startup with full error handling. If unavailable:
 

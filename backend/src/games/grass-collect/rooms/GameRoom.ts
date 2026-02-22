@@ -1,7 +1,7 @@
-import { Room, Client } from "colyseus";
+import { Room, Client, matchMaker } from "colyseus";
 import { GameState } from "../schemas/GameState";
 import { PlayerState } from "../schemas/PlayerState";
-import { GrassState } from "../schemas/GrassState";
+import { ItemState } from "../schemas/GrassState";
 import {
   ARENA_WIDTH,
   ARENA_HEIGHT,
@@ -14,11 +14,12 @@ import {
   MATCH_RESET_DELAY,
   TICK_RATE,
   MATCH_DURATION,
-  GRASS_COUNT,
-  GRASS_RADIUS,
+  TILE_SIZE,
+  COLS,
+  ROWS,
   PLAYER_RADIUS,
 } from "../utils/constants";
-import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
+import { saveMatchResult, savePlayerStats, updatePlayerName } from "../../../db/matchHistory";
 
 // ─── Message types from the client ───────────────────────
 interface MoveInput {
@@ -33,8 +34,11 @@ interface JoinOptions {
 export class GameRoom extends Room<GameState> {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private resetTimeout: ReturnType<typeof setTimeout> | null = null;
+  private playerCutTimers: Map<string, Map<string, number>> = new Map();
 
   // ───── Room lifecycle ────────────────────────────────────
+
+  private _emptyRoomTimeout: ReturnType<typeof setTimeout> | null = null;
 
   async onCreate(options: any) {
     if (options.customRoomId) {
@@ -43,6 +47,24 @@ export class GameRoom extends Room<GameState> {
     this.state = new GameState();
     this.maxClients = MAX_PLAYERS;
 
+    // Prevent auto-dispose so clients have time to join after transition
+    this.autoDispose = false;
+
+    // For transition rooms, don't lock immediately - allows joinById to work
+    // The matchmaker won't find it via joinOrCreate because it uses a customId
+    // and we only broadcast the ID to specific players anyway.
+    if (options.isTransitionRoom) {
+      // this.lock(); // REMOVED: joinById respects the lock in some setups
+    }
+
+    // If nobody joins within 15 seconds, dispose manually
+    this._emptyRoomTimeout = setTimeout(() => {
+      if (this.state.players.size === 0) {
+        console.log(`🏟️ No players joined ${this.roomId}, disposing.`);
+        this.disconnect();
+      }
+    }, 15000);
+
     // Set arena boundaries on state
     this.state.arenaBoundaryX = ARENA_WIDTH;
     this.state.arenaBoundaryY = ARENA_HEIGHT;
@@ -50,6 +72,18 @@ export class GameRoom extends Room<GameState> {
     // Register message handlers
     this.onMessage("move", (client: Client, data: MoveInput) => {
       this.handleMove(client, data);
+    });
+
+    this.onMessage("updateName", async (client: Client, name: string) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player && name && name.length <= 15) {
+        player.displayName = name;
+        console.log(`👤 Name update: ${name} (${client.sessionId})`);
+        
+        if (player.playerId) {
+          await updatePlayerName(player.playerId, name);
+        }
+      }
     });
 
     // Set up the authoritative simulation loop
@@ -61,12 +95,20 @@ export class GameRoom extends Room<GameState> {
   }
 
   onJoin(client: Client, options: any) {
+    console.log(`🏟️ Client joining ${this.roomId}:`, JSON.stringify(options));
+    // Cancel auto-dispose since someone joined
+    if (this._emptyRoomTimeout) {
+      clearTimeout(this._emptyRoomTimeout);
+      this._emptyRoomTimeout = null;
+    }
+
     const player = new PlayerState();
 
     // Random spawn position within safe margin
     player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
     player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
-    player.score = 0;
+    // Carry over score from previous game so the leaderboard stays cumulative
+    player.score = options?.previousScore ?? 0;
     player.displayName =
       options?.displayName || `Player_${client.sessionId.slice(0, 4)}`;
     player.playerId = options?.playerId || client.sessionId;
@@ -96,16 +138,34 @@ export class GameRoom extends Room<GameState> {
 
     this.state.players.delete(client.sessionId);
 
+    // If a game in progress is left with only 1 player, it's forfeit
     if (this.state.matchStarted && !this.state.matchEnded) {
       if (this.state.players.size < MIN_PLAYERS) {
         this.endMatch();
       }
     }
+
+    // ZOMBIE CLEANUP: If the room is now empty, ensure it disposes after 10 seconds.
+    // This is necessary because autoDispose is set to false in onCreate.
+    if (this.state.players.size === 0) {
+      this.resetEmptyRoomTimeout();
+    }
+  }
+
+  private resetEmptyRoomTimeout() {
+    if (this._emptyRoomTimeout) clearTimeout(this._emptyRoomTimeout);
+    this._emptyRoomTimeout = setTimeout(() => {
+      if (this.state.players.size === 0) {
+        console.log(`🏟️ Emergency disposing empty room ${this.roomId}`);
+        this.disconnect();
+      }
+    }, 15000); // Wait 15s to allow for transitions or rejoin
   }
 
   onDispose() {
     if (this.countdownInterval) clearInterval(this.countdownInterval);
     if (this.resetTimeout) clearTimeout(this.resetTimeout);
+    if (this._emptyRoomTimeout) clearTimeout(this._emptyRoomTimeout);
     console.log(`���️  GameRoom disposed | Room ID: ${this.roomId}`);
   }
 
@@ -176,50 +236,81 @@ export class GameRoom extends Room<GameState> {
       }
 
       // ── Check Grass Collection ──
-      for (let i = this.state.grasses.length - 1; i >= 0; i--) {
-        const grass = this.state.grasses[i];
-        const dx = player.x - grass.x;
-        const dy = player.y - grass.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+      const c = Math.floor(player.x / TILE_SIZE);
+      const r = Math.floor(player.y / TILE_SIZE);
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+        const idx = r * COLS + c;
+        const tileVal = this.state.grid[idx];
+        if (tileVal > 0) {
+          const key = `${r},${c}`;
+          const playerTimers = this.playerCutTimers.get(sessionId);
+          const lastCut = playerTimers?.get(key) || 0;
+          const now = Date.now();
+          if (now - lastCut > 500) { // 500ms cooldown per tile per entity
+            this.state.grid[idx]--;
+            playerTimers?.set(key, now);
+            if (this.state.grid[idx] === 0) {
+              player.score += 10;
+            }
+          }
+        }
+      }
 
-        if (dist < PLAYER_RADIUS + GRASS_RADIUS) {
-          // Collected!
-          player.score += 1;
-          this.state.grasses.splice(i, 1);
-          this.handlePowerup(sessionId, player);
+      // ── Check Item Collision ──
+      for (let i = this.state.items.length - 1; i >= 0; i--) {
+        const item = this.state.items[i];
+        if (!item.active) continue;
+
+        // Reveal item if grass is cut at least once
+        const itemC = Math.floor(item.x / TILE_SIZE);
+        const itemR = Math.floor(item.y / TILE_SIZE);
+        const itemIdx = itemR * COLS + itemC;
+        if (!item.revealed && this.state.grid[itemIdx] <= 1) {
+          item.revealed = true;
+        }
+
+        if (item.revealed) {
+          if (item.type === 'mine') {
+            item.timer -= dt;
+            if (item.timer <= 0) {
+              item.active = false;
+              // Explode: stun players nearby
+              this.state.players.forEach((p, id) => {
+                const dx = p.x - item.x;
+                const dy = p.y - item.y;
+                if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 2) {
+                  p.stunTimer = 2;
+                  p.score = Math.max(0, p.score - 5);
+                }
+              });
+            }
+          } else if (item.type === 'booster') {
+            const dx = player.x - item.x;
+            const dy = player.y - item.y;
+            if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS + TILE_SIZE / 2) {
+              item.active = false;
+              player.speedMultiplier = 1.5;
+              setTimeout(() => {
+                if (this.state.players.has(sessionId)) {
+                  this.state.players.get(sessionId)!.speedMultiplier = 1;
+                }
+              }, 4000);
+            }
+          }
         }
       }
     });
 
     // Check if all grass collected
-    if (this.state.grasses.length === 0) {
-      this.endMatch();
+    let grassLeft = false;
+    for (let i = 0; i < this.state.grid.length; i++) {
+      if (this.state.grid[i] > 0) {
+        grassLeft = true;
+        break;
+      }
     }
-  }
-
-  private handlePowerup(collectorId: string, player: PlayerState) {
-    const rand = Math.random();
-    if (rand < 0.05) {
-      // 5% chance: Speed Booster
-      player.speedMultiplier = 2;
-      this.state.lastEvent = `${player.displayName} found a Speed Booster!`;
-      setTimeout(() => {
-        if (this.state.players.has(collectorId)) {
-          this.state.players.get(collectorId)!.speedMultiplier = 1;
-        }
-      }, 5000);
-    } else if (rand < 0.10) {
-      // 5% chance: Bomb (stun self)
-      player.stunTimer = 3;
-      this.state.lastEvent = `${player.displayName} stepped on a Bomb!`;
-    } else if (rand < 0.12) {
-      // 2% chance: Rocket (stun others)
-      this.state.lastEvent = `${player.displayName} launched a Rocket!`;
-      this.state.players.forEach((p, id) => {
-        if (id !== collectorId) {
-          p.stunTimer = 3;
-        }
-      });
+    if (!grassLeft) {
+      this.endMatch();
     }
   }
 
@@ -257,26 +348,41 @@ export class GameRoom extends Room<GameState> {
     this.state.arenaBoundaryX = ARENA_WIDTH;
     this.state.arenaBoundaryY = ARENA_HEIGHT;
 
-    // Spawn Grass
-    while (this.state.grasses.length > 0) {
-      this.state.grasses.pop();
-    }
-    for (let i = 0; i < GRASS_COUNT; i++) {
-      const grass = new GrassState();
-      grass.id = `grass_${i}`;
-      grass.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      grass.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
-      this.state.grasses.push(grass);
+    // Initialize Grid
+    this.state.grid.clear();
+    for (let i = 0; i < ROWS * COLS; i++) {
+      this.state.grid.push(2); // 2 = full grass
     }
 
-    this.state.players.forEach((player: PlayerState) => {
-      player.score = 0;
+    // Spawn Items
+    this.state.items.clear();
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (Math.random() < 0.05) {
+          const item = new ItemState();
+          item.id = `item_${r}_${c}`;
+          item.x = c * TILE_SIZE + TILE_SIZE / 2;
+          item.y = r * TILE_SIZE + TILE_SIZE / 2;
+          item.type = Math.random() > 0.3 ? 'mine' : 'booster';
+          item.revealed = false;
+          item.active = true;
+          item.timer = 2 + Math.random() * 3;
+          this.state.items.push(item);
+        }
+      }
+    }
+
+    this.playerCutTimers.clear();
+
+    this.state.players.forEach((player: PlayerState, sessionId: string) => {
+      // score is NOT reset here — it carries over from previousScore set in onJoin
       player.speedMultiplier = 1;
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
       player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
       player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+      this.playerCutTimers.set(sessionId, new Map());
     });
 
     console.log(`��� Match started! ${this.state.players.size} players in the arena.`);
@@ -285,6 +391,9 @@ export class GameRoom extends Room<GameState> {
 
   private endMatch() {
     this.state.matchEnded = true;
+
+    // Lock so the matchmaker won't route Quick Connect players into this finished room
+    this.lock();
 
     let winnerId = "";
     let winnerName = "";
@@ -345,8 +454,15 @@ export class GameRoom extends Room<GameState> {
     }).catch((err) => console.warn(`⚠️  Failed to save match: ${err.message}`));
 
     // Auto-reset room after delay
-    this.resetTimeout = setTimeout(() => {
-      this.resetMatch();
+    this.resetTimeout = setTimeout(async () => {
+      try {
+        const nextRoomId = this.roomId + "_rd";
+        await matchMaker.createRoom("red_dynamite_room", { customRoomId: nextRoomId, isTransitionRoom: true });
+        this.broadcast("next_game", { roomId: nextRoomId, roomName: "red_dynamite_room" });
+      } catch (e) {
+        console.error("Failed to create next room", e);
+        this.resetMatch();
+      }
     }, MATCH_RESET_DELAY);
   }
 
@@ -359,10 +475,9 @@ export class GameRoom extends Room<GameState> {
     this.state.countdown = 0;
     this.state.lastEvent = "";
 
-    // Clear grass
-    while (this.state.grasses.length > 0) {
-      this.state.grasses.pop();
-    }
+    // Clear grid and items
+    this.state.grid.clear();
+    this.state.items.clear();
 
     this.state.players.forEach((player: PlayerState) => {
       player.score = 0;

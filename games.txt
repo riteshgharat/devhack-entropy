@@ -1,0 +1,64 @@
+=========================================
+CHAOS ARENA – MINIGAME CATALOG
+=========================================
+
+Mode 1: HOT DYNAMITE (Refined)
+-----------------------------------------
+An AI-driven elimination brawl where speed and spatial awareness are survival.
+
+Players enter the arena as customizable Pixel Stickmen. The match is overseen by a sadistic AI Game Master who initiates the chaos. At the start of each round, a 'Hot Dynamite' is forcefully attached to one random stickman.
+
+CORE MECHANICS:
+- THE PASS: Move into another player to transfer the dynamite.
+- THE COUNTDOWN: A visible timer (rendered via Canvas VFX) ticks down overhead. The timer decreases faster as players are eliminated.
+- DETONATION: When the timer hits zero, the dynamite explodes (Full-screen ScreenShake + PixelFire particles), eliminating the holder instantly.
+
+AI CHAOS INTERVENTIONS:
+- THE SLIP: The AI may grease the arena floors, increasing drift and making it harder to pass.
+- BOMB SPAWNS: Secondary decoys appear to confuse players.
+- SPEED BOOSTERS: Golden tiles appear to help players escape—or chase.
+
+VICTORY:
+The last stickman remaining is crowned 'Arena Champion' and receives a global leaderboard boost.
+
+-----------------------------------------
+
+Mode 2: GRASS COLLECT (Standard Mode)
+-----------------------------------------
+A high-energy collection sprint where the AI Game Master tinkers with the laws of physics.
+
+Players scramble to gather glowing 'Grass' tiles (Resource Nodes) spawned across the arena. Each collection adds to the score, but every tile gathered brings the AI closer to a 'Chaos Pulse'.
+
+CORE MECHANICS:
+- THE SPRINT: High-speed movement across a 800x600 arena with momentum-based physics.
+- THE NODES: 50+ nodes appear in waves. Some nodes provide 'Powerups' (Speed Booster, Shield, Stun Bomb).
+- THE COUNTER: A 60-second survival clock. The player with the highest collection total wins.
+
+AI CHAOS INTERVENTIONS:
+- THE STORM: AI periodically pulls all players toward the center or pushes them to the edges.
+- STUN LOCK: AI targets the leader with stun frames to allow others to catch up.
+- GRAVITY SHIFT: Temporary inversion of movement controls.
+
+VICTOR:
+The stickman with the highest 'Grass Total' at zero seconds wins. Points are immediately synced to the global SQLite leaderboard.
+
+-----------------------------------------
+
+Mode 3: STAY ALIVE (Chaos Tiles)
+-----------------------------------------
+A high-tension multiplayer survival challenge where the very ground beneath your feet is out to get you.
+
+Players are trapped on a pixelated grid that is constantly monitored by the AI Game Master. Every few seconds, the AI picks random 'Victim Tiles' that flip from safe to lethal.
+
+CORE MECHANICS:
+- THE GRID: A 15x15 tiled arena (logical 800x600 layout) that flashes to indicate danger.
+- THE COUNTDOWN: A pulsating tile overlay warning players of an imminent 'Chaos Blast'.
+- THE ELIMINATION: Being caught on an active 'Bomb Tile' results in instant 'Vaporization' (Canvas-based VFX).
+
+AI CHAOS INTERVENTIONS:
+- THE SHUFFLE: The AI Game Master swaps tile states at the last second to confuse 'Pros'.
+- ICE FLOORS: Friction is reduced, making it difficult to stop on a single safe tile.
+- BLIND ARENA: The AI blacks out the screen except for a small viewport around the player during a blast phase.
+
+VICTORY:
+The last stickman remaining is crowned the 'Void Survivor'. Winning boosts the rank on the SQLite Global Leaderboard.

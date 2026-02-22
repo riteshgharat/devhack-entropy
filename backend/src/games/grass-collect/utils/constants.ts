@@ -6,6 +6,9 @@ export const TICK_RATE = 60;
 /** Arena dimensions (world units) */
 export const ARENA_WIDTH = 800;
 export const ARENA_HEIGHT = 600;
+export const TILE_SIZE = 40;
+export const COLS = Math.ceil(ARENA_WIDTH / TILE_SIZE);
+export const ROWS = Math.ceil(ARENA_HEIGHT / TILE_SIZE);
 
 /** Player limits per room */
 export const MAX_PLAYERS = 8;

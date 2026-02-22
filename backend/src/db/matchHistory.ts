@@ -46,6 +46,22 @@ export async function savePlayerStats(players: { id: string, displayName: string
   }
 }
 
+export async function updatePlayerName(playerId: string, displayName: string): Promise<void> {
+  if (isSQLiteAvailable()) {
+    try {
+      const db = getDB()!;
+      db.prepare(`
+        INSERT INTO players (id, display_name, matches, wins, score)
+        VALUES (?, ?, 0, 0, 0)
+        ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
+      `).run(playerId, displayName);
+      console.log(`📝 Player name updated in SQLite: ${displayName}`);
+    } catch (err: any) {
+      console.warn(`⚠️  SQLite player name update failed: ${err.message}`);
+    }
+  }
+}
+
 export async function getLeaderboard(limit: number = 10): Promise<PlayerStat[]> {
   if (isSQLiteAvailable()) {
     try {

@@ -49,54 +49,36 @@ Deliver a polished, playable multiplayer game within 12 hours that showcases rea
 ## 5. Core Gameplay
 
 ### Game Loop
-1. Player creates or joins room.
-2. AI introduces the match.
-3. Arena initializes.
-4. AI modifies environment periodically.
-5. Players get eliminated.
-6. Last player standing wins.
+1. Player enters via a stylish **Chaos Splash Screen**.
+2. Persistent **identity** (Name, Color, ID) is synced across devices.
+3. Player selects a mini-game from the catalog in the **Multiplayer Lobby**.
+4. **AI Game Master** (Meme-driven, sadistic) introduces the mode.
+5. Arena initializes with real-time physics and shared state.
+6. Players compete for high scores or survival.
+7. Post-match: Global **Leaderboard** updates with rank tracking.
 
 ---
 
 ## 6. Core Features
 
-### 6.1 Multiplayer Survival
-- 2–8 players per room
-- Constant movement controls
-- Jump/dodge mechanic
-- Elimination on fall or collision
+### 6.1 Mini-Game Catalog
 
----
+#### Mode 1: Hot Dynamite (The Hot Potato Edition)
+- **Objective**: Don't hold the bomb when it ticks to zero.
+- **Chaos Factor**: The AI GM spawns "Safe Zones" that aren't actually safe.
+- **Victory**: Last survivor or highest survival time.
 
-### 6.2 AI Game Master
+#### Mode 2: Grass Collect (The Speed Farmer Edition)
+- **Objective**: Touch as many grass patches as possible in 60 seconds.
+- **Chaos Factor**: AI GM spawns "Poison Patches" or flips gravity/speed.
+- **Victory**: Highest grass count.
 
-#### Personality
-- Sadistic
-- Funny
-- Chaotic meme-driven
+### 6.2 AI Game Master (The "GM" Agent)
 
-#### Behavior Logic
-- Targets the leader
-- Occasionally bullies the weakest player
-- Reacts to emoji activity
-- Triggers arena changes at intervals
-
-#### Output
-- Commentary panel updates
-- Visual arena transformation
-- Trap spawning
-- Environmental shifts
-
----
-
-### 6.3 Arena System (Hybrid Model)
-
-- Predefined physics modules
-- Modular traps and obstacles
-- AI rearranges layout dynamically
-- Controlled chaos intervals
-
----
+#### Personality & Behavior
+- **Sadistic/Funny**: Delivered via top-bar commentary.
+- **Dynamic Targeting**: Focuses on the "Sweaty" (Top Player) or the "Noob" (Bot-like players).
+- **Arena Intervention**: Spawns obstacles, resets scores, or grants "Cursed" power-ups.
 
 ### 6.4 Emoji Interaction
 

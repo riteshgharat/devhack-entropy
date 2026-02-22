@@ -14,6 +14,7 @@ export class PlayerState extends Schema {
   @type("boolean") hasDynamite: boolean = false;
   @type("number") passCooldown: number = 0;
   @type("number") score: number = 0; // Points for surviving
+  @type("boolean") isReady: boolean = false;
 }
 
 export class RedDynamiteState extends Schema {
@@ -31,4 +32,5 @@ export class RedDynamiteState extends Schema {
 
   @type("string") winnerId: string = "";
   @type("string") lastEvent: string = "";
+  @type("string") ownerId: string = "";
 }

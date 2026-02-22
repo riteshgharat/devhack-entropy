@@ -309,7 +309,7 @@ const PixelStickman: React.FC<StickmanProps> = ({
 /* ── CRT Scanlines ── */
 const ScanLines = () => (
   <div
-    className="fixed inset-0 pointer-events-none z-[100]"
+    className="fixed inset-0 pointer-events-none z-100"
     style={{
       background:
         "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px)",
@@ -332,7 +332,7 @@ const PixelParticles = () => {
   }));
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-[5]">
+    <div className="fixed inset-0 pointer-events-none z-5">
       {particles.map((p) => (
         <motion.div
           key={p.id}
@@ -368,7 +368,7 @@ const LightningBolt: React.FC<{ x: number; delay: number }> = ({
   delay,
 }) => (
   <motion.div
-    className="absolute pointer-events-none z-[8]"
+    className="absolute pointer-events-none z-8"
     style={{
       left: `${x}%`,
       top: 0,
@@ -398,7 +398,7 @@ const StarField = () => {
     blink: Math.random() * 3,
   }));
   return (
-    <div className="fixed inset-0 pointer-events-none z-[1]">
+    <div className="fixed inset-0 pointer-events-none z-1">
       {stars.map((star) => (
         <motion.div
           key={star.id}
@@ -466,7 +466,7 @@ const ComboText: React.FC<{ text: string; show: boolean }> = ({
   <AnimatePresence>
     {show && (
       <motion.div
-        className="absolute z-[50] left-1/2 -translate-x-1/2"
+        className="absolute z-50 left-1/2 -translate-x-1/2"
         style={{
           top: "30%",
           fontFamily: '"Press Start 2P", system-ui',
@@ -534,7 +534,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
     <AnimatePresence>
       {phase < 5 && (
         <motion.div
-          className="fixed inset-0 z-[999] overflow-hidden"
+          className="fixed inset-0 z-999 overflow-hidden"
           style={{ backgroundColor: "#050508" }}
           animate={
             phase >= 4
@@ -560,7 +560,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
           {/* Ambient glow top */}
           <div
-            className="fixed inset-0 pointer-events-none z-[2]"
+            className="fixed inset-0 pointer-events-none z-2"
             style={{
               background:
                 phase >= 3
@@ -572,7 +572,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
           {/* Vignette */}
           <div
-            className="fixed inset-0 pointer-events-none z-[2]"
+            className="fixed inset-0 pointer-events-none z-2"
             style={{
               background:
                 "radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.75) 100%)",
@@ -593,7 +593,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
           >
             {/* ═══ BACKGROUND GRID ═══ */}
             <div
-              className="fixed inset-0 z-[1] pointer-events-none"
+              className="fixed inset-0 z-1 pointer-events-none"
               style={{
                 backgroundImage:
                   "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
@@ -603,12 +603,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
             {/* ═══ CHARACTERS ═══ */}
             <div
-              className="absolute z-[10] w-full flex items-end justify-center"
+              className="absolute z-10 w-full flex items-end justify-center"
               style={{ bottom: "12%" }}
             >
               {/* Ground platform */}
               <motion.div
-                className="absolute bottom-0 left-[5%] right-[5%] z-[1]"
+                className="absolute bottom-0 left-[5%] right-[5%] z-1"
                 style={{
                   height: "6px",
                   backgroundColor: "#1e293b",
@@ -621,7 +621,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
               {/* Ground tiles */}
               {phase >= 1 && (
                 <div
-                  className="absolute bottom-0 left-[5%] right-[5%] z-[1]"
+                  className="absolute bottom-0 left-[5%] right-[5%] z-1"
                   style={{ height: "6px", display: "flex", overflow: "hidden" }}
                 >
                   {Array.from({ length: 30 }, (_, i) => (
@@ -826,7 +826,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
             {/* ═══ IMPACT FLASH when red slams ═══ */}
             {phase === 1 && (
               <motion.div
-                className="fixed inset-0 z-[30] pointer-events-none"
+                className="fixed inset-0 z-30 pointer-events-none"
                 style={{ backgroundColor: "#ef4444" }}
                 initial={{ opacity: 0.8 }}
                 animate={{ opacity: 0 }}
@@ -837,7 +837,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
             {/* Red bottom glow */}
             {phase >= 1 && (
               <motion.div
-                className="fixed bottom-0 left-0 right-0 pointer-events-none z-[3]"
+                className="fixed bottom-0 left-0 right-0 pointer-events-none z-3"
                 style={{
                   height: "40%",
                   background:
@@ -865,7 +865,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
             <AnimatePresence>
               {phase >= 3 && (
                 <motion.div
-                  className="absolute z-[20] w-full flex flex-col items-center pointer-events-auto"
+                  className="absolute z-20 w-full flex flex-col items-center pointer-events-auto"
                   style={{ top: "5%" }}
                   initial={{ y: -900, opacity: 0, scale: 4, rotate: -8 }}
                   animate={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
@@ -1056,7 +1056,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
             {/* White flash when title slams */}
             {phase === 3 && (
               <motion.div
-                className="fixed inset-0 z-[30] pointer-events-none"
+                className="fixed inset-0 z-30 pointer-events-none"
                 style={{ backgroundColor: "#ffffff" }}
                 initial={{ opacity: 0.9 }}
                 animate={{ opacity: 0 }}

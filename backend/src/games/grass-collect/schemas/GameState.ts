@@ -33,4 +33,7 @@ export class GameState extends Schema {
 
   /** Last event label (broadcast to clients for UI) */
   @type("string") lastEvent: string = "";
+
+  /** Session ID of the player who created the room */
+  @type("string") ownerId: string = "";
 }

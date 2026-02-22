@@ -32,3 +32,12 @@ export const MATCH_DURATION = 60; // seconds (first game)
 export const GRASS_COUNT = 50; // total grass to spawn
 export const GRASS_RADIUS = 15;
 export const PLAYER_RADIUS = 15;
+
+/** Power-up Constants */
+export const BOMB_STUN_DURATION = 3;        // seconds — bomb stuns the player who uncovered it
+export const ROCKET_STUN_DURATION = 3;      // seconds — rocket stuns all OTHER players
+export const SPEED_BOOST_DURATION = 5;      // seconds — speed boost lasts this long
+export const SPEED_BOOST_MULTIPLIER = 1.8;  // movement speed multiplier when boosted
+export const NUM_BOMBS = 8;
+export const NUM_ROCKETS = 8;
+export const NUM_BOOSTERS = 8;

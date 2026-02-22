@@ -19,6 +19,13 @@ import {
   COLS,
   ROWS,
   PLAYER_RADIUS,
+  BOMB_STUN_DURATION,
+  ROCKET_STUN_DURATION,
+  SPEED_BOOST_DURATION,
+  SPEED_BOOST_MULTIPLIER,
+  NUM_BOMBS,
+  NUM_ROCKETS,
+  NUM_BOOSTERS,
 } from "../utils/constants";
 import {
   saveMatchResult,
@@ -92,6 +99,15 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
+    this.onMessage("ready", (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || this.state.matchStarted) return;
+      player.isReady = !player.isReady;
+      const status = player.isReady ? "✅ READY" : "⏳ NOT READY";
+      console.log(`${status}: ${player.displayName}`);
+      this.tryStartCountdown();
+    });
+
     // Set up the authoritative simulation loop
     this.setSimulationInterval((deltaTime: number) => {
       this.update(deltaTime);
@@ -137,14 +153,17 @@ export class GameRoom extends Room<GameState> {
 
     this.state.players.set(client.sessionId, player);
 
+    // First player becomes the room owner
+    if (this.state.players.size === 1) {
+      this.state.ownerId = client.sessionId;
+    }
+
     console.log(
       `✅ ${player.displayName} joined | ` +
         `Session: ${client.sessionId} | ` +
         `Players: ${this.state.players.size}/${MAX_PLAYERS}`,
     );
-
-    // Start countdown if we have enough players
-    this.tryStartCountdown();
+    // No auto-start — wait for all players to send "ready"
   }
 
   onLeave(client: Client, _consented?: boolean) {
@@ -270,13 +289,17 @@ export class GameRoom extends Room<GameState> {
           const lastCut = playerTimers?.get(key) || 0;
           const now = Date.now();
           if (now - lastCut > 500) {
-            // 500ms cooldown per tile per entity
             this.state.grid[idx]--;
             playerTimers?.set(key, now);
+
+            // Big grass just cut (2→1): reveal any hidden items at this tile
+            if (tileVal === 2 && this.state.grid[idx] === 1) {
+              this.triggerHiddenItems(sessionId, player, r, c);
+            }
+
             if (this.state.grid[idx] === 0) {
               player.score += 10;
 
-              // Track score milestones for AI commentary
               if (player.score % 50 === 0 && player.score > 0) {
                 this.comms.addEvent(
                   `${player.displayName} hits ${player.score} points!`,
@@ -287,59 +310,48 @@ export class GameRoom extends Room<GameState> {
         }
       }
 
-      // ── Check Item Collision ──
+      // ── Check Revealed Item Collection (boosters & rockets) ──
       for (let i = this.state.items.length - 1; i >= 0; i--) {
         const item = this.state.items[i];
-        if (!item.active) continue;
+        if (!item.active || !item.revealed || item.type === "bomb") continue;
 
-        // Reveal item if grass is cut at least once
-        const itemC = Math.floor(item.x / TILE_SIZE);
-        const itemR = Math.floor(item.y / TILE_SIZE);
-        const itemIdx = itemR * COLS + itemC;
-        if (!item.revealed && this.state.grid[itemIdx] <= 1) {
-          item.revealed = true;
-        }
+        const dx = player.x - item.x;
+        const dy = player.y - item.y;
+        if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS + TILE_SIZE / 2) {
+          item.active = false;
 
-        if (item.revealed) {
-          if (item.type === "mine") {
-            item.timer -= dt;
-            if (item.timer <= 0) {
-              item.active = false;
-              // Explode: stun players nearby
-              let stunCount = 0;
-              this.state.players.forEach((p, id) => {
-                const dx = p.x - item.x;
-                const dy = p.y - item.y;
-                if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 2) {
-                  p.stunTimer = 2;
-                  p.score = Math.max(0, p.score - 5);
-                  stunCount++;
-                  this.comms.addEvent(
-                    `${p.displayName} hit by mine (-5 pts, stunned)`,
-                  );
-                }
-              });
-              if (stunCount > 1) {
-                this.comms.addEvent(
-                  `MINE EXPLOSION! ${stunCount} players stunned`,
-                );
+          if (item.type === "booster") {
+            player.speedMultiplier = SPEED_BOOST_MULTIPLIER;
+            this.comms.addEvent(
+              `⚡ ${player.displayName} grabbed speed boost!`,
+            );
+            this.broadcast("booster_collected", {
+              x: item.x,
+              y: item.y,
+              playerId: sessionId,
+              playerName: player.displayName,
+            });
+            setTimeout(() => {
+              if (this.state.players.has(sessionId)) {
+                this.state.players.get(sessionId)!.speedMultiplier = 1;
               }
-            }
-          } else if (item.type === "booster") {
-            const dx = player.x - item.x;
-            const dy = player.y - item.y;
-            if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS + TILE_SIZE / 2) {
-              item.active = false;
-              player.speedMultiplier = 1.5;
-              this.comms.addEvent(
-                `${player.displayName} grabbed speed booster!`,
-              );
-              setTimeout(() => {
-                if (this.state.players.has(sessionId)) {
-                  this.state.players.get(sessionId)!.speedMultiplier = 1;
-                }
-              }, 4000);
-            }
+            }, SPEED_BOOST_DURATION * 1000);
+          } else if (item.type === "rocket") {
+            // Stun ALL other players
+            this.state.players.forEach((p, id) => {
+              if (id !== sessionId) {
+                p.stunTimer = ROCKET_STUN_DURATION;
+              }
+            });
+            this.comms.addEvent(
+              `🚀 ${player.displayName} launched a ROCKET!`,
+            );
+            this.broadcast("rocket_launched", {
+              x: item.x,
+              y: item.y,
+              launcherId: sessionId,
+              launcherName: player.displayName,
+            });
           }
         }
       }
@@ -360,11 +372,61 @@ export class GameRoom extends Room<GameState> {
 
   // ───── Game logic helpers ────────────────────────────────
 
+  /** When a grass tile is fully cleared, trigger any hidden item at that cell */
+  private triggerHiddenItems(
+    sessionId: string,
+    player: PlayerState,
+    r: number,
+    c: number,
+  ) {
+    for (let i = 0; i < this.state.items.length; i++) {
+      const item = this.state.items[i];
+      if (!item.active || item.revealed) continue;
+
+      const itemC = Math.floor(item.x / TILE_SIZE);
+      const itemR = Math.floor(item.y / TILE_SIZE);
+      if (itemC !== c || itemR !== r) continue;
+
+      if (item.type === "bomb") {
+        // INSTANT explosion — stuns the player who uncovered it
+        player.stunTimer = BOMB_STUN_DURATION;
+        player.score = Math.max(0, player.score - 5);
+        item.revealed = true;
+        item.active = false;
+        this.broadcast("bomb_explode", {
+          x: item.x,
+          y: item.y,
+          victimId: sessionId,
+          victimName: player.displayName,
+        });
+        this.comms.addEvent(
+          `💣 ${player.displayName} uncovered a bomb! Stunned!`,
+        );
+      } else {
+        // Booster or Rocket — pop out of the grass, must be collected separately
+        item.revealed = true;
+        this.broadcast("item_pop", {
+          id: item.id,
+          type: item.type,
+          x: item.x,
+          y: item.y,
+        });
+      }
+    }
+  }
+
   private tryStartCountdown() {
     if (this.state.matchStarted || this.countdownInterval) return;
     if (this.state.players.size < MIN_PLAYERS) return;
 
-    console.log(`⏳ Countdown starting...`);
+    // All players must have clicked Ready
+    let allReady = true;
+    this.state.players.forEach((p) => {
+      if (!p.isReady) allReady = false;
+    });
+    if (!allReady) return;
+
+    console.log(`⏳ All players ready — countdown starting...`);
     this.state.countdown = MATCH_COUNTDOWN;
 
     this.countdownInterval = setInterval(() => {
@@ -398,21 +460,37 @@ export class GameRoom extends Room<GameState> {
       this.state.grid.push(2); // 2 = full grass
     }
 
-    // Spawn Items
+    // Spawn exactly 8 bombs, 8 rockets, 8 speed boosters at random unique tiles
     this.state.items.clear();
+    const allTiles: { r: number; c: number }[] = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        if (Math.random() < 0.05) {
-          const item = new ItemState();
-          item.id = `item_${r}_${c}`;
-          item.x = c * TILE_SIZE + TILE_SIZE / 2;
-          item.y = r * TILE_SIZE + TILE_SIZE / 2;
-          item.type = Math.random() > 0.3 ? "mine" : "booster";
-          item.revealed = false;
-          item.active = true;
-          item.timer = 2 + Math.random() * 3;
-          this.state.items.push(item);
-        }
+        allTiles.push({ r, c });
+      }
+    }
+    // Fisher-Yates shuffle
+    for (let i = allTiles.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allTiles[i], allTiles[j]] = [allTiles[j], allTiles[i]];
+    }
+    const itemDefs: { type: string; count: number }[] = [
+      { type: "bomb", count: NUM_BOMBS },
+      { type: "rocket", count: NUM_ROCKETS },
+      { type: "booster", count: NUM_BOOSTERS },
+    ];
+    let tileIdx = 0;
+    for (const def of itemDefs) {
+      for (let n = 0; n < def.count && tileIdx < allTiles.length; n++) {
+        const { r, c } = allTiles[tileIdx++];
+        const item = new ItemState();
+        item.id = `item_${r}_${c}`;
+        item.x = c * TILE_SIZE + TILE_SIZE / 2;
+        item.y = r * TILE_SIZE + TILE_SIZE / 2;
+        item.type = def.type;
+        item.revealed = false;
+        item.active = true;
+        item.timer = 0;
+        this.state.items.push(item);
       }
     }
 
@@ -546,6 +624,7 @@ export class GameRoom extends Room<GameState> {
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
+      player.isReady = false;
       player.x =
         SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
       player.y =

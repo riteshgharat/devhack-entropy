@@ -30,4 +30,7 @@ export class PlayerState extends Schema {
 
   /** Player color */
   @type("string") color: string = "#ffffff";
+
+  /** Whether player has clicked Ready in the lobby */
+  @type("boolean") isReady: boolean = false;
 }

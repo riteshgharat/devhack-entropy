@@ -86,6 +86,14 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
       }
     });
 
+    this.onMessage("ready", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || player.isBot || this.state.matchStarted) return;
+      player.isReady = !player.isReady;
+      console.log(`${player.isReady ? "✅" : "⏳"} READY: ${player.displayName}`);
+      this.tryStartCountdown();
+    });
+
     this.setSimulationInterval(
       (deltaTime) => this.update(deltaTime),
       TIME_STEP,
@@ -119,11 +127,16 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
     this.spawnHuman(player);
     this.state.players.set(client.sessionId, player);
+
+    // First human becomes room owner
+    if (this.getHumanCount() === 1) {
+      this.state.ownerId = client.sessionId;
+    }
+
     console.log(
       `⚽ ${player.displayName} joined (Team ${player.team}) | Players: ${this.getHumanCount()}`,
     );
-
-    this.tryStartCountdown();
+    // No auto-start — wait for all players to send "ready"
   }
 
   onLeave(client: Client) {
@@ -244,6 +257,13 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
       !this.state.matchStarted &&
       this.state.countdown === 0
     ) {
+      // All human players must be ready
+      let allReady = true;
+      this.state.players.forEach((p) => {
+        if (!p.isBot && !p.isReady) allReady = false;
+      });
+      if (!allReady) return;
+
       this.state.countdown = COUNTDOWN_SECONDS;
       this.countdownInterval = setInterval(() => {
         this.state.countdown--;

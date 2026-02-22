@@ -5,15 +5,23 @@ import { PixelCharacter } from "./components/PixelCharacter";
 import { PlayerStats } from "./components/PlayerStats";
 import { SplashScreen } from "./components/SplashScreen";
 import { MultiplayerLobby } from "./components/MultiplayerLobby";
+import { PreGameLobby } from "./components/PreGameLobby";
+import { ArenaEntryScreen } from "./components/ArenaEntryScreen";
 import { motion, AnimatePresence } from "motion/react";
-import { Settings, Volume2, Monitor, Sun, Moon, User } from "lucide-react";
+import { Settings, Volume2, Sun, Moon, User, LogIn, UserPlus, Pencil } from "lucide-react";
+import {
+  AuthScreen,
+  PlayerProfileBadge,
+  type UserProfile,
+  getStoredSession,
+  clearSession,
+} from "./components/AuthScreen";
 import { PixelCard } from "./components/PixelCard";
 import { GameArena } from "./components/GameArena";
 import { GrassGame } from "./components/games/GrassGame";
 import { RedDynamiteGame } from "./components/games/RedDynamiteGame";
 import { TurfSoccerGame } from "./components/games/TurfSoccerGame";
 import { CommunicationHub } from "./components/CommunicationHub";
-import { BigOverlayBanner, AIOverlayData } from "./components/BigOverlayBanner";
 import { gameClient } from "./services/gameClient";
 import { Room } from "colyseus.js";
 import {
@@ -25,7 +33,9 @@ import { Mic, MicOff } from "lucide-react";
 
 function App() {
   const [showSettings, setShowSettings] = React.useState(false);
-  const [showSplash, setShowSplash] = React.useState(true);
+  const [showSplash, setShowSplash] = React.useState(
+    () => !sessionStorage.getItem("splashShown"),
+  );
   const [nightMode, setNightMode] = React.useState(true); // default NIGHT
   const [showMultiplayer, setShowMultiplayer] = React.useState(false);
   const [lobbyInitialTab, setLobbyInitialTab] = React.useState<
@@ -35,9 +45,28 @@ function App() {
     localStorage.getItem("playerColor") || "#ef4444",
   );
   const [activeRoom, setActiveRoom] = React.useState<Room | null>(null);
-  const [aiOverlay, setAiOverlay] = React.useState<AIOverlayData | null>(null);
+  const [gameStarted, setGameStarted] = React.useState(false);
+  const [showArenaEntry, setShowArenaEntry] = React.useState(false);
   const [voiceSettings, setVoiceSettings] =
     React.useState<VoiceSettings>(loadVoiceSettings);
+
+  // Auth state
+  const [currentUser, setCurrentUser] = React.useState<UserProfile | null>(
+    () => getStoredSession(),
+  );
+  const [showAuthScreen, setShowAuthScreen] = React.useState(false);
+  const [authInitialTab, setAuthInitialTab] = React.useState<
+    "signin" | "signup"
+  >("signin");
+  const [showEditProfile, setShowEditProfile] = React.useState(false);
+
+  // Sync display name + color from auth profile
+  React.useEffect(() => {
+    if (currentUser) {
+      setDisplayName(currentUser.username);
+      setCharacterColor(currentUser.avatarColor);
+    }
+  }, [currentUser]);
 
   // Persist voice settings whenever they change
   React.useEffect(() => {
@@ -190,9 +219,12 @@ function App() {
     sessionStorage.removeItem("reconnectionToken");
   }, []);
 
-  // Reset AI overlay when the active room changes (avoids stale overlays between games)
+  // Reset game-started flag + show arena entry when the active room changes
   React.useEffect(() => {
-    setAiOverlay(null);
+    setGameStarted(false);
+    if (activeRoom) {
+      setShowArenaEntry(true);
+    }
   }, [activeRoom?.roomId]);
 
   const handleJoinRoom = (room: Room) => {
@@ -203,17 +235,35 @@ function App() {
   const handleLeaveRoom = () => {
     gameClient.leave();
     setActiveRoom(null);
+    setGameStarted(false);
+    setShowArenaEntry(false);
   };
 
   if (showSplash) {
-    return <SplashScreen onComplete={() => setShowSplash(false)} />;
+    return <SplashScreen onComplete={() => { sessionStorage.setItem("splashShown", "1"); setShowSplash(false); }} />;
   }
 
   return (
     <div className="min-h-screen relative flex flex-col">
       <Background nightMode={nightMode} />
 
-      {activeRoom ? (
+      {/* Arena entry transition overlay */}
+      {activeRoom && showArenaEntry && (
+        <ArenaEntryScreen
+          characterColor={characterColor}
+          onComplete={() => setShowArenaEntry(false)}
+        />
+      )}
+
+      {activeRoom && !gameStarted ? (
+        <PreGameLobby
+          room={activeRoom}
+          nightMode={nightMode}
+          setNightMode={setNightMode}
+          onGameStart={() => setGameStarted(true)}
+          onLeave={handleLeaveRoom}
+        />
+      ) : activeRoom && gameStarted ? (
         <div className="relative z-10 flex-1 flex flex-col">
           <header className="pt-6 pb-2 text-center relative shrink-0">
             <h1
@@ -232,7 +282,6 @@ function App() {
           <div className="flex flex-1 gap-2 px-2 pb-2 min-h-0 items-start overflow-auto">
             {/* Game canvas area with AI overlay banner */}
             <div className="relative flex-1 min-w-0">
-              <BigOverlayBanner overlay={aiOverlay} />
               {activeRoom.name === "red_dynamite_room" ? (
                 <RedDynamiteGame
                   room={activeRoom}
@@ -272,7 +321,6 @@ function App() {
                 room={activeRoom}
                 nightMode={nightMode}
                 mySessionId={activeRoom.sessionId}
-                onOverlay={setAiOverlay}
                 voiceSettings={voiceSettings}
               />
             </div>
@@ -280,7 +328,7 @@ function App() {
         </div>
       ) : (
         <>
-          {/* Day/Night Toggle — fixed top-left */}
+          {/* Day/Night Toggle — fixed top-left (home page) */}
           <motion.button
             onClick={() => setNightMode(!nightMode)}
             className={`fixed top-4 left-4 z-50 w-14 h-14 border-4 flex items-center justify-center transition-colors duration-500 cursor-pointer pixel-corners ${
@@ -335,6 +383,47 @@ function App() {
             {nightMode ? "🌙 Night" : "☀️ Day"}
           </motion.div>
 
+          {/* Top-right: Profile badge OR Sign In */}
+          {currentUser ? (
+            <PlayerProfileBadge
+              user={currentUser}
+              nightMode={nightMode}
+              onLogout={() => {
+                clearSession();
+                setCurrentUser(null);
+              }}
+              onEditProfile={() => setShowEditProfile(true)}
+            />
+          ) : (
+            <motion.div
+              className="fixed top-4 right-4 z-50 flex items-center gap-2"
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.4, type: "spring" }}
+            >
+              <button
+                onClick={() => { setAuthInitialTab("signin"); setShowAuthScreen(true); }}
+                className={`flex items-center gap-2 px-3 py-2 border-4 font-display text-[10px] uppercase tracking-wide transition-colors duration-300 cursor-pointer ${
+                  nightMode
+                    ? "bg-slate-800/90 border-indigo-600 text-indigo-300 hover:border-indigo-400"
+                    : "bg-white/90 border-slate-700 text-slate-700 hover:border-indigo-500"
+                }`}
+              >
+                <LogIn size={13} /> Sign In
+              </button>
+              <button
+                onClick={() => { setAuthInitialTab("signup"); setShowAuthScreen(true); }}
+                className={`flex items-center gap-2 px-3 py-2 border-4 font-display text-[10px] uppercase tracking-wide transition-colors duration-300 cursor-pointer ${
+                  nightMode
+                    ? "bg-indigo-600/90 border-indigo-800 text-white hover:bg-indigo-500"
+                    : "bg-amber-500/90 border-amber-700 text-white hover:bg-amber-400"
+                }`}
+              >
+                <UserPlus size={13} /> Sign Up
+              </button>
+            </motion.div>
+          )}
+
           {/* Header / Logo */}
           <header className="relative z-10 pt-12 pb-6 text-center">
             <motion.h1
@@ -375,8 +464,8 @@ function App() {
                 />
               </div>
 
-              {/* Center: Menu */}
-              <div className="flex flex-col gap-6 items-center justify-center order-1 lg:order-2">
+              {/* Center: Menu — all items centered */}
+              <div className="flex flex-col gap-4 items-center justify-center order-1 lg:order-2">
                 <PixelButton
                   size="lg"
                   className="w-64 text-xl tracking-widest animate-pulse"
@@ -418,8 +507,29 @@ function App() {
                   className="w-64"
                   onClick={() => setShowSettings(true)}
                 >
-                  Settings
+                  <Settings size={14} className="inline mr-2" />Settings
                 </PixelButton>
+
+                {!currentUser && (
+                  <>
+                    <PixelButton
+                      variant="secondary"
+                      size="md"
+                      className="w-64"
+                      onClick={() => { setAuthInitialTab("signin"); setShowAuthScreen(true); }}
+                    >
+                      <LogIn size={14} className="inline mr-2" />Sign In
+                    </PixelButton>
+                    <PixelButton
+                      variant="primary"
+                      size="md"
+                      className="w-64"
+                      onClick={() => { setAuthInitialTab("signup"); setShowAuthScreen(true); }}
+                    >
+                      <UserPlus size={14} className="inline mr-2" />Sign Up
+                    </PixelButton>
+                  </>
+                )}
               </div>
 
               {/* Right: Player Stats */}
@@ -468,83 +578,22 @@ function App() {
           >
             <PixelCard title="Settings" className="mx-4" nightMode={nightMode}>
               <div className="space-y-6 mt-4">
-                <div className="space-y-2">
-                  <label
-                    className={`font-display text-xs uppercase flex items-center gap-2 transition-colors duration-700 ${
-                      nightMode ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    <User size={14} /> Player Name
-                  </label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className={`w-full p-2 border-2 font-display text-xs outline-none transition-colors duration-700 ${
-                      nightMode
-                        ? "bg-slate-700 border-slate-600 text-slate-200 focus:border-indigo-500"
-                        : "bg-white border-slate-300 text-slate-800 focus:border-green-500"
-                    }`}
-                    maxLength={15}
-                  />
-                </div>
 
-                <div className="space-y-2">
-                  <label
-                    className={`font-display text-xs uppercase flex items-center gap-2 transition-colors duration-700 ${
-                      nightMode ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    <Volume2 size={14} /> Audio
-                  </label>
-                  <input
-                    type="range"
-                    className={`w-full h-4 rounded-none appearance-none cursor-pointer ${
-                      nightMode
-                        ? "accent-indigo-500 bg-slate-600"
-                        : "accent-green-500 bg-slate-200"
-                    }`}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    className={`font-display text-xs uppercase flex items-center gap-2 transition-colors duration-700 ${
-                      nightMode ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    <Monitor size={14} /> Graphics
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      className={`flex-1 py-2 border-2 font-display text-xs ${
-                        nightMode
-                          ? "border-indigo-500 bg-indigo-900/50 text-indigo-300"
-                          : "border-green-500 bg-green-100 text-green-700"
-                      }`}
-                    >
-                      High
-                    </button>
-                    <button
-                      className={`flex-1 py-2 border-2 font-display text-xs ${
-                        nightMode
-                          ? "border-slate-600 bg-slate-700 text-slate-400 hover:border-slate-500"
-                          : "border-slate-300 bg-white text-slate-500 hover:border-slate-400"
-                      }`}
-                    >
-                      Med
-                    </button>
-                    <button
-                      className={`flex-1 py-2 border-2 font-display text-xs ${
-                        nightMode
-                          ? "border-slate-600 bg-slate-700 text-slate-400 hover:border-slate-500"
-                          : "border-slate-300 bg-white text-slate-500 hover:border-slate-400"
-                      }`}
-                    >
-                      Low
-                    </button>
-                  </div>
-                </div>
+                {/* Edit Profile */}
+                <button
+                  onClick={() => { setShowSettings(false); setShowEditProfile(true); }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 border-2 font-display text-xs uppercase tracking-wide transition-colors duration-300 cursor-pointer ${
+                    nightMode
+                      ? "bg-slate-700/60 border-indigo-600 text-indigo-300 hover:border-indigo-400"
+                      : "bg-indigo-50 border-indigo-400 text-indigo-700 hover:border-indigo-600"
+                  }`}
+                >
+                  <Pencil size={14} />
+                  <span>Edit Profile</span>
+                  <span className={`ml-auto font-body text-sm ${
+                    nightMode ? "text-slate-400" : "text-slate-500"
+                  }`}>{currentUser ? currentUser.username : displayName}</span>
+                </button>
 
                 {/* ── Voice Commentary ── */}
                 <div className="space-y-3">
@@ -706,6 +755,242 @@ function App() {
                     onClick={() => setShowSettings(false)}
                   >
                     Close
+                  </PixelButton>
+                </div>
+              </div>
+            </PixelCard>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Auth Screen Modal */}
+      <AnimatePresence>
+        {showAuthScreen && (
+          <AuthScreen
+            nightMode={nightMode}
+            initialTab={authInitialTab}
+            onAuth={(user) => {
+              setCurrentUser(user);
+              setShowAuthScreen(false);
+            }}
+            onClose={() => setShowAuthScreen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-sm"
+          >
+            <PixelCard title="Edit Profile" className="mx-4" nightMode={nightMode}>
+              <div className="space-y-5 mt-4">
+                {/* Display Name */}
+                <div className="space-y-2">
+                  <label className={`font-display text-xs uppercase flex items-center gap-2 ${
+                    nightMode ? "text-slate-400" : "text-slate-500"
+                  }`}>
+                    <User size={14} /> Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={`w-full p-2 border-2 font-display text-xs outline-none ${
+                      nightMode
+                        ? "bg-slate-700 border-slate-600 text-slate-200 focus:border-indigo-500"
+                        : "bg-white border-slate-300 text-slate-800 focus:border-indigo-500"
+                    }`}
+                    maxLength={15}
+                  />
+                </div>
+
+                {/* Avatar Color */}
+                <div className="space-y-2">
+                  <label className={`font-display text-xs uppercase ${
+                    nightMode ? "text-slate-400" : "text-slate-500"
+                  }`}>
+                    Avatar Color
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      "#ef4444", "#3b82f6", "#22c55e", "#eab308",
+                      "#a855f7", "#f97316", "#ec4899", "#06b6d4",
+                    ].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setCharacterColor(c)}
+                        className={`w-full aspect-square border-4 transition-transform hover:scale-110 cursor-pointer ${
+                          characterColor === c ? "border-white scale-110" : "border-black/30"
+                        }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Character preview */}
+                <div className="flex justify-center">
+                  <div
+                    className="w-12 h-12 border-4 border-black/30 flex items-center justify-center"
+                    style={{ backgroundColor: characterColor }}
+                  >
+                    <div className="w-3 h-3 bg-white" />
+                  </div>
+                </div>
+
+                <div className={`flex justify-between pt-4 border-t-2 ${
+                  nightMode ? "border-slate-600" : "border-slate-100"
+                }`}>
+                  <PixelButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowEditProfile(false)}
+                  >
+                    Cancel
+                  </PixelButton>
+                  <PixelButton
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      // Persist changes
+                      localStorage.setItem("displayName", displayName);
+                      localStorage.setItem("playerColor", characterColor);
+                      // If logged in, update current user profile
+                      if (currentUser) {
+                        const updated = { ...currentUser, username: displayName, avatarColor: characterColor };
+                        setCurrentUser(updated);
+                        localStorage.setItem(
+                          "chaos_arena_session",
+                          JSON.stringify(updated),
+                        );
+                      }
+                      setShowEditProfile(false);
+                    }}
+                  >
+                    Save Changes
+                  </PixelButton>
+                </div>
+              </div>
+            </PixelCard>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Auth Screen Modal */}
+      <AnimatePresence>
+        {showAuthScreen && (
+          <AuthScreen
+            nightMode={nightMode}
+            initialTab={authInitialTab}
+            onAuth={(user) => {
+              setCurrentUser(user);
+              setShowAuthScreen(false);
+            }}
+            onClose={() => setShowAuthScreen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Edit Profile Modal */}
+      {showEditProfile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="w-full max-w-sm"
+          >
+            <PixelCard title="Edit Profile" className="mx-4" nightMode={nightMode}>
+              <div className="space-y-5 mt-4">
+                {/* Display Name */}
+                <div className="space-y-2">
+                  <label className={`font-display text-xs uppercase flex items-center gap-2 ${
+                    nightMode ? "text-slate-400" : "text-slate-500"
+                  }`}>
+                    <User size={14} /> Display Name
+                  </label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className={`w-full p-2 border-2 font-display text-xs outline-none ${
+                      nightMode
+                        ? "bg-slate-700 border-slate-600 text-slate-200 focus:border-indigo-500"
+                        : "bg-white border-slate-300 text-slate-800 focus:border-indigo-500"
+                    }`}
+                    maxLength={15}
+                  />
+                </div>
+
+                {/* Avatar Color */}
+                <div className="space-y-2">
+                  <label className={`font-display text-xs uppercase ${
+                    nightMode ? "text-slate-400" : "text-slate-500"
+                  }`}>
+                    Avatar Color
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      "#ef4444", "#3b82f6", "#22c55e", "#eab308",
+                      "#a855f7", "#f97316", "#ec4899", "#06b6d4",
+                    ].map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setCharacterColor(c)}
+                        className={`w-full aspect-square border-4 transition-transform hover:scale-110 cursor-pointer ${
+                          characterColor === c ? "border-white scale-110" : "border-black/30"
+                        }`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview */}
+                <div className="flex justify-center">
+                  <div
+                    className="w-14 h-14 border-4 border-black/30 flex items-center justify-center"
+                    style={{ backgroundColor: characterColor }}
+                  >
+                    <div className="w-4 h-4 bg-white" />
+                  </div>
+                </div>
+
+                <div className={`flex justify-between pt-4 border-t-2 ${
+                  nightMode ? "border-slate-600" : "border-slate-100"
+                }`}>
+                  <PixelButton
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowEditProfile(false)}
+                  >
+                    Cancel
+                  </PixelButton>
+                  <PixelButton
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      localStorage.setItem("displayName", displayName);
+                      localStorage.setItem("playerColor", characterColor);
+                      if (currentUser) {
+                        const updated = {
+                          ...currentUser,
+                          username: displayName,
+                          avatarColor: characterColor,
+                        };
+                        setCurrentUser(updated);
+                        localStorage.setItem(
+                          "chaos_arena_session",
+                          JSON.stringify(updated),
+                        );
+                      }
+                      setShowEditProfile(false);
+                    }}
+                  >
+                    Save Changes
                   </PixelButton>
                 </div>
               </div>

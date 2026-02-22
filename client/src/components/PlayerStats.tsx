@@ -163,7 +163,7 @@ export const PlayerStats: React.FC<PlayerStatsProps> = ({
           className={`flex items-center gap-3 p-3 border-2 ${
             nightMode
               ? "bg-slate-700/50 border-slate-600"
-              : "bg-gradient-to-r from-slate-50 to-white border-slate-200"
+              : "bg-linear-to-r from-slate-50 to-white border-slate-200"
           }`}
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}

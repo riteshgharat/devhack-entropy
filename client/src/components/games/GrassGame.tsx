@@ -87,6 +87,100 @@ class Particle {
   }
 }
 
+class RocketProjectile {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  trail: { x: number; y: number; alpha: number }[];
+
+  constructor(x: number, y: number, angle: number) {
+    this.x = x;
+    this.y = y;
+    const speed = 350;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.life = 1.0;
+    this.trail = [];
+  }
+
+  update(dt: number): boolean {
+    this.trail.push({ x: this.x, y: this.y, alpha: 1 });
+    if (this.trail.length > 8) this.trail.shift();
+    this.trail.forEach((t) => {
+      t.alpha -= dt * 3;
+    });
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.life -= dt;
+    return this.life > 0;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    // Trail
+    for (const t of this.trail) {
+      if (t.alpha <= 0) continue;
+      ctx.globalAlpha = Math.max(0, t.alpha * 0.6);
+      ctx.fillStyle = "#ff6600";
+      ctx.beginPath();
+      ctx.arc(t.x, t.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Head
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ff4444";
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    // Flame
+    const angle = Math.atan2(this.vy, this.vx);
+    ctx.fillStyle = "#ffaa00";
+    ctx.beginPath();
+    ctx.arc(
+      this.x - Math.cos(angle) * 8,
+      this.y - Math.sin(angle) * 8,
+      3 + Math.random() * 2,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fill();
+  }
+}
+
+class Shockwave {
+  x: number;
+  y: number;
+  radius: number;
+  life: number;
+  color: string;
+
+  constructor(x: number, y: number, color: string = "#ff4444") {
+    this.x = x;
+    this.y = y;
+    this.radius = 0;
+    this.life = 1;
+    this.color = color;
+  }
+
+  update(dt: number): boolean {
+    this.radius += dt * 300;
+    this.life -= dt * 2;
+    return this.life > 0;
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    ctx.strokeStyle = this.color;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = Math.max(0, this.life);
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+  }
+}
+
 export const GrassGame: React.FC<GrassGameProps> = ({
   room,
   nightMode,
@@ -97,6 +191,10 @@ export const GrassGame: React.FC<GrassGameProps> = ({
   const [gameState, setGameState] = useState<any>(room.state);
   const [showEndScreen, setShowEndScreen] = useState(false);
   const [nextGameTimer, setNextGameTimer] = useState(5);
+  const [eventBanners, setEventBanners] = useState<
+    { id: number; text: string; icon: string; color: string }[]
+  >([]);
+  const bannerIdRef = useRef(0);
 
   const particlesRef = useRef<Particle[]>([]);
   const explosionsRef = useRef<
@@ -106,6 +204,9 @@ export const GrassGame: React.FC<GrassGameProps> = ({
   const colorIndexRef = useRef(0);
   const prevGridRef = useRef<number[]>([]);
   const prevItemsRef = useRef<Map<string, boolean>>(new Map());
+  const rocketProjectilesRef = useRef<RocketProjectile[]>([]);
+  const shockwavesRef = useRef<Shockwave[]>([]);
+  const screenShakeRef = useRef({ x: 0, y: 0, intensity: 0 });
 
   const getPlayerColor = useCallback((sessionId: string): string => {
     if (!playerColorsRef.current.has(sessionId)) {
@@ -240,11 +341,17 @@ export const GrassGame: React.FC<GrassGameProps> = ({
     nextGameFiredRef.current = false;
     hasMatchStartedRef.current = false;
 
+    // alive guard: Colyseus onMessage appends listeners and doesn't remove them
+    // on re-registration. If React strict-mode double-fires the effect, or the
+    // effect re-runs for any reason, the OLD listeners are still active. This
+    // flag ensures only the latest set of listeners actually does work.
+    let alive = true;
+
     room.onMessage(
       "next_game",
       (data: { roomId: string; roomName: string }) => {
+        if (!alive) return;
         console.log("[GrassGame] next_game received:", data);
-        // Guard: Colyseus appends listeners on every registration, so only fire once
         if (nextGameFiredRef.current) return;
         nextGameFiredRef.current = true;
         onNextGameRef.current?.(data.roomId, data.roomName);
@@ -252,14 +359,126 @@ export const GrassGame: React.FC<GrassGameProps> = ({
     );
 
     room.onMessage("match_start", (data: { countdown: number }) => {
+      if (!alive) return;
       console.log("[GrassGame] match_start received:", data);
     });
 
     room.onMessage("match_over", () => {
+      if (!alive) return;
       console.log("[GrassGame] match_over received");
     });
 
+    // ── Power-up animation handlers ──
+    room.onMessage(
+      "bomb_explode",
+      (data: { x: number; y: number; victimId: string; victimName: string }) => {
+        if (!alive) return;
+        // Banner
+        const bid = ++bannerIdRef.current;
+        setEventBanners((prev) => [
+          ...prev,
+          { id: bid, text: `${data.victimName} stepped on a Bomb!`, icon: "💣", color: "#ef4444" },
+        ]);
+        setTimeout(() => setEventBanners((prev) => prev.filter((b) => b.id !== bid)), 3000);
+        // Shockwave ring
+        shockwavesRef.current.push(new Shockwave(data.x, data.y, "#ff4444"));
+        // Explosion flash
+        explosionsRef.current.push({
+          x: data.x,
+          y: data.y,
+          radius: 0,
+          life: 1,
+        });
+        // Fire + smoke particles
+        for (let i = 0; i < 20; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, "#ff9800", "#f44336", 180),
+          );
+        }
+        for (let i = 0; i < 8; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, "#555", "#888", 80),
+          );
+        }
+        // Screen shake
+        screenShakeRef.current.intensity = 10;
+      },
+    );
+
+    room.onMessage(
+      "item_pop",
+      (data: { id: string; type: string; x: number; y: number }) => {
+        if (!alive) return;
+        // Green grass burst (item pops out of grass)
+        for (let i = 0; i < 12; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, "#4CAF50", "#81C784", 120),
+          );
+        }
+        // Colored flash matching item type
+        const color = data.type === "booster" ? "#00bcd4" : "#ff4444";
+        for (let i = 0; i < 6; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, color, "#fff", 60),
+          );
+        }
+      },
+    );
+
+    room.onMessage(
+      "booster_collected",
+      (data: { x: number; y: number; playerId: string; playerName: string }) => {
+        if (!alive) return;
+        // Banner
+        const bid = ++bannerIdRef.current;
+        setEventBanners((prev) => [
+          ...prev,
+          { id: bid, text: `${data.playerName} grabbed Speed Boost!`, icon: "⚡", color: "#00bcd4" },
+        ]);
+        setTimeout(() => setEventBanners((prev) => prev.filter((b) => b.id !== bid)), 3000);
+        // Cyan sparkle burst
+        for (let i = 0; i < 15; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, "#00bcd4", "#e0f7fa", 120),
+          );
+        }
+        shockwavesRef.current.push(new Shockwave(data.x, data.y, "#00bcd4"));
+      },
+    );
+
+    room.onMessage(
+      "rocket_launched",
+      (data: { x: number; y: number; launcherId: string; launcherName: string }) => {
+        if (!alive) return;
+        // Banner
+        const bid = ++bannerIdRef.current;
+        setEventBanners((prev) => [
+          ...prev,
+          { id: bid, text: `${data.launcherName} launched a Rocket!`, icon: "🚀", color: "#ff6600" },
+        ]);
+        setTimeout(() => setEventBanners((prev) => prev.filter((b) => b.id !== bid)), 3000);
+        // Central flash
+        shockwavesRef.current.push(new Shockwave(data.x, data.y, "#ff6600"));
+        // 8 rocket projectiles in all directions
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          rocketProjectilesRef.current.push(
+            new RocketProjectile(data.x, data.y, angle),
+          );
+        }
+        // Center burst particles
+        for (let i = 0; i < 10; i++) {
+          particlesRef.current.push(
+            new Particle(data.x, data.y, "#ff6600", "#ff4444", 100),
+          );
+        }
+        // Screen shake
+        screenShakeRef.current.intensity = 6;
+      },
+    );
+
     room.onStateChange((state) => {
+      if (!alive) return;
       setGameState({ ...state });
 
       // Mark that we saw an active match (needed to guard the end screen below)
@@ -301,28 +520,20 @@ export const GrassGame: React.FC<GrassGameProps> = ({
         prevGridRef.current = Array.from(state.grid);
       }
 
-      // Detect item explosions
+      // Track item state changes (fallback particles)
       if (state.items) {
         state.items.forEach((item: any) => {
           const wasActive = prevItemsRef.current.get(item.id) ?? true;
-          if (wasActive && !item.active && item.type === "mine") {
-            // Mine exploded
-            explosionsRef.current.push({
-              x: item.x,
-              y: item.y,
-              radius: 0,
-              life: 1,
-            });
-            for (let i = 0; i < 15; i++) {
+          if (wasActive && !item.active) {
+            const colors =
+              item.type === "bomb"
+                ? ["#ff9800", "#f44336"]
+                : item.type === "booster"
+                  ? ["#00bcd4", "#e0f7fa"]
+                  : ["#ff4444", "#ff6600"]; // rocket
+            for (let i = 0; i < 8; i++) {
               particlesRef.current.push(
-                new Particle(item.x, item.y, "#ff9800", "#f44336", 150),
-              );
-            }
-          } else if (wasActive && !item.active && item.type === "booster") {
-            // Booster collected
-            for (let i = 0; i < 10; i++) {
-              particlesRef.current.push(
-                new Particle(item.x, item.y, "#00bcd4", "#e0f7fa", 100),
+                new Particle(item.x, item.y, colors[0], colors[1], 100),
               );
             }
           }
@@ -331,8 +542,8 @@ export const GrassGame: React.FC<GrassGameProps> = ({
       }
     });
 
-    // No removeAllListeners - only remove what we own
-    return () => {};
+    // Cleanup: mark stale so duplicate listeners from Colyseus are silenced
+    return () => { alive = false; };
   }, [room]); // onNextGame intentionally excluded — stored in ref to avoid duplicate listener registration
 
   // Render Loop
@@ -352,6 +563,19 @@ export const GrassGame: React.FC<GrassGameProps> = ({
       // Clear background
       ctx.fillStyle = PALETTE.dirt;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Apply screen shake
+      const shake = screenShakeRef.current;
+      const shakeActive = shake.intensity > 0.5;
+      if (shakeActive) {
+        ctx.save();
+        ctx.translate(
+          (Math.random() - 0.5) * shake.intensity,
+          (Math.random() - 0.5) * shake.intensity,
+        );
+        shake.intensity *= 0.92;
+        if (shake.intensity < 0.5) shake.intensity = 0;
+      }
 
       // Draw Grid
       if (gameState.grid) {
@@ -409,45 +633,127 @@ export const GrassGame: React.FC<GrassGameProps> = ({
         }
       }
 
-      // Draw Items
+      // Draw Items — card-style icons (only revealed & active boosters and rockets)
       if (gameState.items) {
         gameState.items.forEach((item: any) => {
           if (!item.active || !item.revealed) return;
           ctx.save();
-          ctx.translate(item.x, item.y);
+          const yBob = Math.sin(time / 200 + item.x) * 3;
+          ctx.translate(item.x, item.y + yBob);
 
-          if (item.type === "mine") {
-            ctx.fillStyle = "#222";
-            ctx.beginPath();
-            ctx.arc(0, 0, 10, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = "#795548";
-            ctx.fillRect(-2, -14, 4, 6); // fuse
-            // Flashing red center based on timer
-            const flashPhase = (time / 100) * (6 - item.timer);
-            if (Math.sin(flashPhase) > 0) {
-              ctx.fillStyle = "#f44336";
-              ctx.beginPath();
-              ctx.arc(0, 0, 4, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else if (item.type === "booster") {
-            const yOffset = Math.sin(time / 200) * 4;
-            ctx.translate(0, yOffset);
-            ctx.fillStyle = "#00bcd4";
+          const cardSize = 28;
+          const half = cardSize / 2;
+          const borderR = 4;
+
+          if (item.type === "booster") {
+            // ── Card background (cyan) ──
             ctx.shadowColor = "#00bcd4";
             ctx.shadowBlur = 10;
+            ctx.fillStyle = "#0097a7";
             ctx.beginPath();
-            ctx.moveTo(-4, -10);
-            ctx.lineTo(6, -10);
-            ctx.lineTo(1, 0);
-            ctx.lineTo(6, 0);
-            ctx.lineTo(-6, 12);
-            ctx.lineTo(-2, 2);
-            ctx.lineTo(-8, 2);
-            ctx.closePath();
+            ctx.roundRect(-half - 2, -half - 2, cardSize + 4, cardSize + 4, borderR + 2);
+            ctx.fill();
+            ctx.fillStyle = "#4dd0e1";
+            ctx.beginPath();
+            ctx.roundRect(-half, -half, cardSize, cardSize, borderR);
             ctx.fill();
             ctx.shadowBlur = 0;
+
+            // ── Boot / shoe icon (speed) ──
+            ctx.fillStyle = "#c62828";
+            // Boot shape
+            ctx.beginPath();
+            ctx.moveTo(-6, -4);
+            ctx.lineTo(4, -8);
+            ctx.lineTo(8, -4);
+            ctx.lineTo(8, 2);
+            ctx.lineTo(12, 6);
+            ctx.lineTo(12, 10);
+            ctx.lineTo(-8, 10);
+            ctx.lineTo(-8, 4);
+            ctx.lineTo(-6, -4);
+            ctx.closePath();
+            ctx.fill();
+            // Boot highlight
+            ctx.fillStyle = "#ef5350";
+            ctx.beginPath();
+            ctx.moveTo(-4, -2);
+            ctx.lineTo(2, -6);
+            ctx.lineTo(6, -2);
+            ctx.lineTo(6, 2);
+            ctx.lineTo(-4, 2);
+            ctx.closePath();
+            ctx.fill();
+            // Speed lines
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.7 + Math.sin(time / 80) * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(-half + 2, -2);
+            ctx.lineTo(-half - 4, -2);
+            ctx.moveTo(-half + 2, 3);
+            ctx.lineTo(-half - 6, 3);
+            ctx.moveTo(-half + 2, 8);
+            ctx.lineTo(-half - 3, 8);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          } else if (item.type === "rocket") {
+            // ── Card background (gold/yellow) ──
+            ctx.shadowColor = "#ff9800";
+            ctx.shadowBlur = 10;
+            ctx.fillStyle = "#e65100";
+            ctx.beginPath();
+            ctx.roundRect(-half - 2, -half - 2, cardSize + 4, cardSize + 4, borderR + 2);
+            ctx.fill();
+            ctx.fillStyle = "#ffc107";
+            ctx.beginPath();
+            ctx.roundRect(-half, -half, cardSize, cardSize, borderR);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // ── Rocket icon (tilted at ~45 degrees) ──
+            ctx.save();
+            ctx.rotate(-Math.PI / 4);
+            // Body
+            ctx.fillStyle = "#fafafa";
+            ctx.fillRect(-4, -8, 8, 14);
+            // Nose cone
+            ctx.fillStyle = "#ff5252";
+            ctx.beginPath();
+            ctx.moveTo(-4, -8);
+            ctx.lineTo(0, -14);
+            ctx.lineTo(4, -8);
+            ctx.closePath();
+            ctx.fill();
+            // Window
+            ctx.fillStyle = "#42a5f5";
+            ctx.beginPath();
+            ctx.arc(0, -3, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            // Fins
+            ctx.fillStyle = "#ff5252";
+            ctx.beginPath();
+            ctx.moveTo(-4, 6);
+            ctx.lineTo(-8, 10);
+            ctx.lineTo(-4, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(4, 6);
+            ctx.lineTo(8, 10);
+            ctx.lineTo(4, 2);
+            ctx.closePath();
+            ctx.fill();
+            // Flame
+            const fh = 3 + Math.random() * 3;
+            ctx.fillStyle = "#ff9800";
+            ctx.beginPath();
+            ctx.moveTo(-2, 6);
+            ctx.lineTo(0, 6 + fh);
+            ctx.lineTo(2, 6);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
           }
           ctx.restore();
         });
@@ -476,6 +782,32 @@ export const GrassGame: React.FC<GrassGameProps> = ({
           particlesRef.current.splice(i, 1);
         } else {
           p.draw(ctx);
+        }
+      }
+
+      // Update & Draw Shockwaves
+      for (let i = shockwavesRef.current.length - 1; i >= 0; i--) {
+        const sw = shockwavesRef.current[i];
+        if (!sw.update(dt)) {
+          shockwavesRef.current.splice(i, 1);
+        } else {
+          sw.draw(ctx);
+        }
+      }
+
+      // Update & Draw Rocket Projectiles
+      for (let i = rocketProjectilesRef.current.length - 1; i >= 0; i--) {
+        const rp = rocketProjectilesRef.current[i];
+        if (!rp.update(dt)) {
+          // Small flash when projectile dies
+          for (let j = 0; j < 5; j++) {
+            particlesRef.current.push(
+              new Particle(rp.x, rp.y, "#ff6600", "#ffaa00", 60),
+            );
+          }
+          rocketProjectilesRef.current.splice(i, 1);
+        } else {
+          rp.draw(ctx);
         }
       }
 
@@ -509,6 +841,21 @@ export const GrassGame: React.FC<GrassGameProps> = ({
             (player.velocityX !== 0 || player.velocityY !== 0)
           ) {
             wiggleY = Math.sin(time / 50) * 3;
+          }
+
+          // Speed trail effect — draw trailing after-images when boosted
+          if (isBuffed) {
+            for (let t = 1; t <= 3; t++) {
+              ctx.globalAlpha = 0.15 / t;
+              ctx.fillStyle = "#00bcd4";
+              ctx.fillRect(
+                -s / 2 - player.velocityX * 0.002 * t,
+                -s / 2 + wiggleY - player.velocityY * 0.002 * t,
+                s,
+                s * 0.8,
+              );
+            }
+            ctx.globalAlpha = 1;
           }
 
           // Shadow
@@ -590,6 +937,11 @@ export const GrassGame: React.FC<GrassGameProps> = ({
 
           ctx.restore();
         });
+      }
+
+      // Restore screen shake transform
+      if (shakeActive) {
+        ctx.restore();
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -696,27 +1048,31 @@ export const GrassGame: React.FC<GrassGameProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Waiting Overlay */}
-          {!gameState.matchStarted && gameState.countdown === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-10">
-              <div className="text-center text-white space-y-4">
-                <Users
-                  size={64}
-                  className="mx-auto text-indigo-400 animate-bounce"
-                />
-                <h2
-                  className="font-display text-3xl tracking-widest"
-                  style={{ textShadow: "4px 4px 0 #000" }}
+          {/* Power-up Event Banners */}
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none">
+            <AnimatePresence>
+              {eventBanners.map((b) => (
+                <motion.div
+                  key={b.id}
+                  initial={{ y: -30, opacity: 0, scale: 0.8 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -20, opacity: 0, scale: 0.8 }}
+                  transition={{ type: "spring", damping: 15 }}
+                  className="px-4 py-2 rounded-lg font-display text-sm text-white whitespace-nowrap"
+                  style={{
+                    backgroundColor: `${b.color}dd`,
+                    boxShadow: `0 0 16px ${b.color}88, 0 4px 12px rgba(0,0,0,0.4)`,
+                    border: `2px solid ${b.color}`,
+                    textShadow: "1px 1px 2px rgba(0,0,0,0.6)",
+                  }}
                 >
-                  WAITING FOR PLAYERS
-                </h2>
-                <p className="font-body text-xl opacity-70">
-                  Need {2 - (gameState.players?.size || 0)} more player(s) to
-                  start
-                </p>
-              </div>
-            </div>
-          )}
+                  <span className="mr-2 text-lg">{b.icon}</span>
+                  {b.text}
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
         </div>
 
         {/* Leaderboard (Right Side) */}
@@ -759,7 +1115,7 @@ export const GrassGame: React.FC<GrassGameProps> = ({
             : "bg-white/80 border-slate-300 text-slate-500"
         }`}
       >
-        WASD / Arrow Keys to move • Grass takes 2 cuts • Watch for Mines!
+        WASD / Arrow Keys to move • Grass = 2 cuts • ⚡ Speed Boost • 🚀 Rocket stuns others • 💣 Bomb stuns you!
       </div>
 
       {/* End Screen Modal */}

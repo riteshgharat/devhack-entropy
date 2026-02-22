@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 /* Color palette — matches the splash screen stickmen */
-const STICKMAN_COLORS = [
+export const STICKMAN_COLORS = [
   { name: "Red", hex: "#ef4444" },
   { name: "Blue", hex: "#3b82f6" },
   { name: "Green", hex: "#22c55e" },
@@ -25,20 +25,26 @@ interface StickmanProps {
   scale?: number;
   weapon?: "sword" | "shield" | "none";
   crown?: boolean;
+  halfBody?: boolean;
+  pointing?: "left" | "right";
+  swordState?: "idle" | "unsheathing";
 }
 
-const PixelStickman: React.FC<StickmanProps> = ({
+export const PixelStickman: React.FC<StickmanProps> = ({
   color,
   eyeColor = "#fff",
   scale = 1,
   weapon = "none",
   crown = false,
+  halfBody = false,
+  pointing,
+  swordState: _swordState,
 }) => {
   const s = (v: number) => `${v * scale}px`;
-  return (
+  const inner = (
     <div
       className="relative"
-      style={{ width: s(56), height: s(90), imageRendering: "pixelated" }}
+      style={{ width: s(56), height: s(90), imageRendering: "pixelated", transform: pointing === "left" ? "scaleX(-1)" : undefined }}
     >
       {/* Crown for leader */}
       {crown && (
@@ -321,6 +327,14 @@ const PixelStickman: React.FC<StickmanProps> = ({
       />
     </div>
   );
+  if (halfBody) {
+    return (
+      <div style={{ width: s(56), height: s(52), overflow: "hidden", imageRendering: "pixelated" }}>
+        {inner}
+      </div>
+    );
+  }
+  return inner;
 };
 
 export const PixelCharacter: React.FC<PixelCharacterProps> = ({

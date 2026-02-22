@@ -6,19 +6,24 @@ import { PixelButton } from "./PixelButton";
 import {
   Trophy,
   Timer,
-  Users,
   Zap,
-  AlertTriangle,
   Rocket,
   Bomb,
-  Wind,
+  Sun,
+  Moon,
+  CheckCircle2,
+  Circle,
+  Crown,
 } from "lucide-react";
 
 interface GameArenaProps {
   room: Room;
   nightMode: boolean;
+  setNightMode: (val: boolean) => void;
   onLeave: () => void;
 }
+
+const MAX_PLAYERS = 8;
 
 /* ── Visual effect types ── */
 interface VFX {
@@ -38,6 +43,18 @@ interface RocketProjectile {
   dx: number;
   dy: number;
   timer: number;
+  trail: { x: number; y: number; alpha: number }[];
+}
+
+interface SpeedParticle {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  timer: number;
+  maxTimer: number;
+  color: string;
 }
 
 interface FloatingText {
@@ -64,6 +81,7 @@ const PLAYER_COLORS = [
 export const GameArena: React.FC<GameArenaProps> = ({
   room,
   nightMode,
+  setNightMode,
   onLeave,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,13 +96,16 @@ export const GameArena: React.FC<GameArenaProps> = ({
   const vfxRef = useRef<VFX[]>([]);
   const rocketsRef = useRef<RocketProjectile[]>([]);
   const floatingTextsRef = useRef<FloatingText[]>([]);
+  const speedParticlesRef = useRef<SpeedParticle[]>([]);
   const playerColorsRef = useRef<Map<string, string>>(new Map());
   const colorIndexRef = useRef(0);
   const vfxIdRef = useRef(0);
   const prevGrassCountRef = useRef(-1);
   const prevScoresRef = useRef<Map<string, number>>(new Map());
+  const timeRef = useRef(0);
 
-  const getPlayerColor = useCallback((sessionId: string): string => {
+  const getPlayerColor = useCallback((sessionId: string, avatarColor?: string): string => {
+    if (avatarColor) return avatarColor;
     if (!playerColorsRef.current.has(sessionId)) {
       playerColorsRef.current.set(
         sessionId,
@@ -157,14 +178,14 @@ export const GameArena: React.FC<GameArenaProps> = ({
           // Find the player who launched it
           state.players?.forEach((player: any, sid: string) => {
             if (evt.includes(player.displayName)) {
-              spawnRocketVFX(player.x, player.y);
+              spawnRocketVFX(player.x, player.y, getPlayerColor(sid, player.color));
             }
           });
         } else if (evt.includes("Speed")) {
           setEventIcon("speed");
           state.players?.forEach((player: any, sid: string) => {
             if (evt.includes(player.displayName)) {
-              spawnSpeedVFX(player.x, player.y);
+              spawnSpeedVFX(player.x, player.y, getPlayerColor(sid, player.color));
             }
           });
         } else {
@@ -189,6 +210,23 @@ export const GameArena: React.FC<GameArenaProps> = ({
           });
         }
         prevScoresRef.current.set(sid, player.score);
+
+        // Speed particle trail
+        if (player.speedMultiplier > 1) {
+          const color = getPlayerColor(sid, player.color);
+          for (let i = 0; i < 2; i++) {
+            speedParticlesRef.current.push({
+              id: vfxIdRef.current++,
+              x: player.x + (Math.random() - 0.5) * 20,
+              y: player.y + (Math.random() - 0.5) * 20,
+              vx: (Math.random() - 0.5) * 60,
+              vy: (Math.random() - 0.5) * 60 - 20,
+              timer: 0.5 + Math.random() * 0.3,
+              maxTimer: 0.8,
+              color,
+            });
+          }
+        }
       });
     });
 
@@ -203,50 +241,59 @@ export const GameArena: React.FC<GameArenaProps> = ({
 
   /* ── VFX Spawn Functions ── */
   const spawnBombVFX = (x: number, y: number) => {
+    // Shockwave rings
     vfxRef.current.push({
       id: vfxIdRef.current++,
       type: "bomb",
       x,
       y,
-      timer: 1.5,
-      maxTimer: 1.5,
+      timer: 1.8,
+      maxTimer: 1.8,
     });
+    // Debris particles
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 / 12) * i;
+      speedParticlesRef.current.push({
+        id: vfxIdRef.current++,
+        x, y,
+        vx: Math.cos(angle) * (80 + Math.random() * 80),
+        vy: Math.sin(angle) * (80 + Math.random() * 80),
+        timer: 1.0 + Math.random() * 0.5,
+        maxTimer: 1.5,
+        color: i % 2 === 0 ? "#ef4444" : "#f97316",
+      });
+    }
   };
 
-  const spawnRocketVFX = (x: number, y: number) => {
-    // Spawn 4 rockets in cardinal directions + 4 diagonal
+  const spawnRocketVFX = (x: number, y: number, _color: string) => {
+    // 8 rockets in all directions
     const directions = [
-      { dx: 0, dy: -1 },
-      { dx: 0, dy: 1 },
-      { dx: -1, dy: 0 },
-      { dx: 1, dy: 0 },
-      { dx: -0.7, dy: -0.7 },
-      { dx: 0.7, dy: -0.7 },
-      { dx: -0.7, dy: 0.7 },
-      { dx: 0.7, dy: 0.7 },
+      { dx: 0, dy: -1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+      { dx: -0.707, dy: -0.707 }, { dx: 0.707, dy: -0.707 },
+      { dx: -0.707, dy: 0.707 }, { dx: 0.707, dy: 0.707 },
     ];
     directions.forEach((d) => {
       rocketsRef.current.push({
         id: vfxIdRef.current++,
-        x,
-        y,
-        dx: d.dx * 300,
-        dy: d.dy * 300,
-        timer: 2.0,
+        x, y,
+        dx: d.dx * 320,
+        dy: d.dy * 320,
+        timer: 2.2,
+        trail: [],
       });
     });
-    // Spawn center explosion
+    // Central explosion flash
     vfxRef.current.push({
       id: vfxIdRef.current++,
       type: "rocket",
       x,
       y,
-      timer: 1.0,
-      maxTimer: 1.0,
+      timer: 0.8,
+      maxTimer: 0.8,
     });
   };
 
-  const spawnSpeedVFX = (x: number, y: number) => {
+  const spawnSpeedVFX = (x: number, y: number, _color: string) => {
     vfxRef.current.push({
       id: vfxIdRef.current++,
       type: "speed",
@@ -255,6 +302,20 @@ export const GameArena: React.FC<GameArenaProps> = ({
       timer: 2.0,
       maxTimer: 2.0,
     });
+    // Burst of lightning-yellow particles upward
+    for (let i = 0; i < 16; i++) {
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI;
+      speedParticlesRef.current.push({
+        id: vfxIdRef.current++,
+        x: x + (Math.random() - 0.5) * 20,
+        y,
+        vx: Math.cos(angle) * (60 + Math.random() * 80),
+        vy: Math.sin(angle) * (100 + Math.random() * 60),
+        timer: 0.8 + Math.random() * 0.4,
+        maxTimer: 1.2,
+        color: "#fbbf24",
+      });
+    }
   };
 
   // Canvas Rendering
@@ -269,8 +330,10 @@ export const GameArena: React.FC<GameArenaProps> = ({
     let lastTime = performance.now();
 
     const render = (now: number) => {
-      const dt = (now - lastTime) / 1000;
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
       lastTime = now;
+      timeRef.current += dt;
+      const _time = timeRef.current;
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -348,12 +411,35 @@ export const GameArena: React.FC<GameArenaProps> = ({
         ft.y -= 40 * dt;
         return ft.timer > 0;
       });
+
+      // Update rockets with trail
       rocketsRef.current = rocketsRef.current.filter((r) => {
         r.timer -= dt;
+        r.trail.push({ x: r.x, y: r.y, alpha: 1.0 });
+        if (r.trail.length > 12) r.trail.shift();
+        r.trail.forEach((t) => { t.alpha -= dt * 3; });
         r.x += r.dx * dt;
         r.y += r.dy * dt;
         return r.timer > 0;
       });
+
+      // Update & draw speed particles
+      speedParticlesRef.current = speedParticlesRef.current.filter((p) => {
+        p.timer -= dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.vy += 150 * dt; // gravity
+        return p.timer > 0;
+      });
+      speedParticlesRef.current.forEach((p) => {
+        const alpha = p.timer / p.maxTimer;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4 * alpha, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1;
 
       // Draw bomb VFX
       vfxRef.current.forEach((v) => {
@@ -362,16 +448,25 @@ export const GameArena: React.FC<GameArenaProps> = ({
         else if (v.type === "speed") drawSpeedEffect(ctx, v);
       });
 
-      // Draw rocket projectiles
-      rocketsRef.current.forEach((r) => {
-        drawRocketProjectile(ctx, r);
+      // Draw rocket projectiles with trails
+      rocketsRef.current.forEach((rocket) => {
+        rocket.trail.forEach((t, i) => {
+          const a = Math.max(0, t.alpha) * (i / rocket.trail.length);
+          ctx.globalAlpha = a * 0.6;
+          ctx.fillStyle = "#f97316";
+          ctx.beginPath();
+          ctx.arc(t.x, t.y, 3 * (i / rocket.trail.length), 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        drawRocketProjectile(ctx, rocket);
       });
 
       // ── DRAW PLAYERS ──
       if (gameState.players) {
         gameState.players.forEach((player: any, sessionId: string) => {
           const isLocal = sessionId === room.sessionId;
-          const color = getPlayerColor(sessionId);
+          const color = getPlayerColor(sessionId, player.color);
           drawPixelStickman(ctx, player, color, isLocal, nightMode);
         });
       }
@@ -886,14 +981,65 @@ export const GameArena: React.FC<GameArenaProps> = ({
         name: p.displayName,
         score: p.score,
         id,
-        color: getPlayerColor(id),
+        color: getPlayerColor(id, p.color),
       });
     });
     return entries.sort((a, b) => b.score - a.score);
   };
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto mt-4 flex flex-col items-center">
+    <div className={`relative w-full max-w-5xl mx-auto mt-4 flex flex-col items-center ${nightMode ? 'text-white' : ''}`}>
+
+      {/* Day/Night Toggle — fixed top-left */}
+      <motion.button
+        onClick={() => setNightMode(!nightMode)}
+        className={`fixed top-4 left-4 z-50 w-14 h-14 border-4 flex items-center justify-center transition-colors duration-500 cursor-pointer pixel-corners ${
+          nightMode
+            ? 'bg-indigo-600 border-indigo-800 hover:bg-indigo-500'
+            : 'bg-amber-400 border-amber-600 hover:bg-amber-300'
+        }`}
+        whileHover={{ scale: 1.1, rotate: 15 }}
+        whileTap={{ scale: 0.9 }}
+        title={nightMode ? 'Switch to Day' : 'Switch to Night'}
+      >
+        <AnimatePresence mode="wait">
+          {nightMode ? (
+            <motion.div
+              key="moon"
+              initial={{ rotate: -90, opacity: 0, scale: 0 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: 90, opacity: 0, scale: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Moon size={24} className="text-yellow-200" fill="currentColor" />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="sun"
+              initial={{ rotate: 90, opacity: 0, scale: 0 }}
+              animate={{ rotate: 0, opacity: 1, scale: 1 }}
+              exit={{ rotate: -90, opacity: 0, scale: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Sun size={24} className="text-amber-800" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
+      {/* Day/Night label — fixed top-left */}
+      <motion.div
+        className={`fixed top-5 left-20 z-50 font-display text-[10px] uppercase tracking-widest px-3 py-1 border-2 transition-colors duration-500 ${
+          nightMode
+            ? 'bg-indigo-900/80 border-indigo-600 text-indigo-300'
+            : 'bg-amber-100/80 border-amber-500 text-amber-800'
+        }`}
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: 0.3 }}
+      >
+        {nightMode ? '🌙 Night' : '☀️ Day'}
+      </motion.div>
       {/* HUD - Top bar */}
       <div className="w-full flex justify-between items-start mb-3 px-2 gap-4">
         {/* Left: Timer + Grass count */}
@@ -1052,25 +1198,149 @@ export const GameArena: React.FC<GameArenaProps> = ({
           )}
         </AnimatePresence>
 
-        {/* Waiting Overlay */}
+        {/* Waiting Overlay — Premium Lobby */}
         {!gameState.matchStarted && gameState.countdown === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-10">
-            <div className="text-center text-white space-y-4">
-              <Users
-                size={64}
-                className="mx-auto text-indigo-400 animate-bounce"
-              />
-              <h2
-                className="font-display text-3xl tracking-widest"
-                style={{ textShadow: "4px 4px 0 #000" }}
-              >
-                WAITING FOR PLAYERS
-              </h2>
-              <p className="font-body text-xl opacity-70">
-                Need {2 - (gameState.players?.size || 0)} more player(s) to
-                start
-              </p>
-            </div>
+          <div className={`absolute inset-0 flex items-center justify-center backdrop-blur-xl z-20 p-6 overflow-y-auto ${nightMode ? 'bg-black/80' : 'bg-amber-50/90'}`}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-6"
+            >
+              {/* LEFT SIDE: Player List */}
+              <div className="space-y-5">
+                <div className="text-left">
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className={`px-2 py-1 ${nightMode ? 'bg-indigo-600' : 'bg-amber-500'}`}>
+                      <span className="font-display text-[10px] text-white uppercase tracking-tighter">Lobby</span>
+                    </div>
+                    <span className={`font-display text-sm tabular-nums ${nightMode ? 'text-slate-400' : 'text-amber-700'}`}>ID: {room.id}</span>
+                  </div>
+                  <h2 className={`font-display text-3xl tracking-widest uppercase ${nightMode ? 'text-white' : 'text-amber-900'}`} style={{ textShadow: nightMode ? '4px 4px 0 #4f46e5' : '4px 4px 0 #fbbf24' }}>
+                    Are you Ready?
+                  </h2>
+                  <p className={`font-body text-sm mt-2 ${nightMode ? 'text-slate-400' : 'text-amber-700/80'}`}>
+                    Mark yourself ready. Game starts when all players are set.
+                  </p>
+                </div>
+
+                <div className={`border-4 p-4 space-y-2 ${nightMode ? 'bg-slate-900/50 border-indigo-500/30' : 'bg-amber-50/80 border-amber-400/50'}`}>
+                  <div className={`flex justify-between items-center mb-3 pb-2 border-b ${nightMode ? 'border-white/10' : 'border-amber-300/40'}`}>
+                    <span className={`font-display text-xs ${nightMode ? 'text-indigo-300' : 'text-amber-700'}`}>Players ({gameState.players?.size || 0}/{MAX_PLAYERS})</span>
+                    <span className={`font-display text-[10px] uppercase ${nightMode ? 'text-white/40' : 'text-amber-600/60'}`}>Status</span>
+                  </div>
+
+                  {Array.from(gameState.players || []).map(([id, p]: [string, any]) => {
+                    const isLocal = id === room.sessionId;
+                    const isOwner = id === gameState.ownerId;
+                    return (
+                      <motion.div
+                        key={id}
+                        layout
+                        className={`flex items-center gap-3 p-3 border-2 transition-colors ${
+                          p.isReady
+                            ? 'border-green-500/50 bg-green-500/10'
+                            : nightMode ? 'border-white/5 bg-white/5' : 'border-amber-300/30 bg-amber-100/30'
+                        }`}
+                      >
+                        <div
+                          className="w-8 h-8 border-2 border-black/40 shrink-0"
+                          style={{ backgroundColor: getPlayerColor(id, p.color) }}
+                        />
+                        <div className="flex-1 overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-display text-sm truncate ${isLocal ? 'text-yellow-400' : nightMode ? 'text-white' : 'text-amber-900'}`}>
+                              {p.displayName}{isLocal && ' (You)'}
+                            </span>
+                            {isOwner && <Crown size={12} className="text-yellow-500" />}
+                          </div>
+                          <span className={`font-body text-[10px] block leading-tight ${nightMode ? 'text-white/40' : 'text-amber-700/60'}`}>
+                            {isOwner ? 'Room Master' : 'Challenger'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {p.isReady ? (
+                            <div className="flex items-center gap-1.5 text-green-400">
+                              <span className="font-display text-[10px] uppercase">Ready</span>
+                              <CheckCircle2 size={16} />
+                            </div>
+                          ) : (
+                            <div className={`flex items-center gap-1.5 ${nightMode ? 'text-white/20' : 'text-amber-400/60'}`}>
+                              <span className="font-display text-[10px] uppercase">Waiting</span>
+                              <Circle size={16} />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+
+                  {Array.from({ length: Math.max(0, 2 - (gameState.players?.size || 0)) }).map((_, i) => (
+                    <div key={`empty-${i}`} className={`flex items-center gap-3 p-3 border-2 border-dashed opacity-30 ${nightMode ? 'border-white/10' : 'border-amber-400/30'}`}>
+                      <div className={`w-8 h-8 border-2 border-dashed ${nightMode ? 'bg-white/5 border-white/20' : 'bg-amber-200/20 border-amber-400/30'}`} />
+                      <span className={`font-display text-[10px] uppercase tracking-widest ${nightMode ? 'text-white/40' : 'text-amber-700/50'}`}>Waiting for player...</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <PixelButton
+                    variant={gameState.players?.get(room.sessionId)?.isReady ? 'secondary' : 'primary'}
+                    className="flex-1 py-4 text-sm"
+                    onClick={() => room.send('ready')}
+                  >
+                    {gameState.players?.get(room.sessionId)?.isReady ? 'CANCEL READY' : 'I AM READY!'}
+                  </PixelButton>
+                  <PixelButton variant="accent" className="px-5" onClick={onLeave}>EXIT</PixelButton>
+                </div>
+              </div>
+
+              {/* RIGHT SIDE: Game Rules */}
+              <div className={`border-4 p-5 flex flex-col justify-between ${nightMode ? 'bg-indigo-950/20 border-indigo-900/50' : 'bg-amber-50/80 border-amber-400/50'}`}>
+                <div className="space-y-5">
+                  <h3 className={`font-display text-lg uppercase tracking-wider flex items-center gap-2 ${nightMode ? 'text-yellow-400' : 'text-amber-700'}`}>
+                    <div className={`w-2 h-5 ${nightMode ? 'bg-yellow-400' : 'bg-amber-500'}`} />
+                    How to Play
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex gap-3 items-start">
+                      <div className={`p-2 border font-display text-xs shrink-0 ${nightMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>MV</div>
+                      <div>
+                        <p className={`font-display text-[11px] uppercase mb-1 ${nightMode ? 'text-white' : 'text-amber-900'}`}>Movement</p>
+                        <p className={`font-body text-xs ${nightMode ? 'text-slate-400' : 'text-amber-700'}`}>Use WASD or Arrow Keys to collect grass tiles.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 items-start">
+                      <div className={`p-2 border font-display text-xs shrink-0 ${nightMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>GR</div>
+                      <div>
+                        <p className={`font-display text-[11px] uppercase mb-1 ${nightMode ? 'text-white' : 'text-amber-900'}`}>Two-Phase Harvest</p>
+                        <p className={`font-body text-xs ${nightMode ? 'text-slate-400' : 'text-amber-700'}`}>Touch Big Grass (2pts) → Small Grass. Wait 0.5s and collect again (1pt).</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className={`font-display text-[11px] uppercase tracking-widest pb-2 border-b ${nightMode ? 'text-indigo-300 border-white/5' : 'text-amber-600 border-amber-300/40'}`}>Power-ups</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[['💣', 'Bomb Trap', 'text-red-300', 'text-red-600'], ['🚀', 'Nuke Rocket', 'text-orange-300', 'text-orange-600'], ['⚡', 'Super Speed', 'text-blue-300', 'text-blue-600'], ['🌿', 'Double Grass', 'text-green-300', 'text-green-600']].map(([icon, label, nightC, dayC]) => (
+                        <div key={label} className={`p-2 flex items-center gap-2 border ${nightMode ? 'bg-black/20 border-white/5' : 'bg-amber-100/50 border-amber-300/40'}`}>
+                          <span className="text-lg">{icon}</span>
+                          <span className={`font-display text-[9px] uppercase ${nightMode ? nightC : dayC}`}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`mt-5 p-3 border ${nightMode ? 'bg-yellow-400/10 border-yellow-400/20' : 'bg-amber-100/60 border-amber-400/40'}`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`animate-pulse w-2 h-2 rounded-full ${nightMode ? 'bg-yellow-400' : 'bg-amber-500'}`} />
+                    <p className={`font-body text-[11px] leading-relaxed italic ${nightMode ? 'text-yellow-100/80' : 'text-amber-800'}`}>
+                      "Pro Tip: Use the Rocket only when opponents are about to clear a large patch!"
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
         )}
       </div>

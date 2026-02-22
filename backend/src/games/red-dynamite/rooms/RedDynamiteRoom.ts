@@ -70,6 +70,14 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       }
     });
 
+    this.onMessage("ready", (client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (!player || this.state.matchStarted) return;
+      player.isReady = !player.isReady;
+      console.log(`${player.isReady ? "✅" : "⏳"} READY: ${player.displayName}`);
+      this.tryStartCountdown();
+    });
+
     this.setSimulationInterval(
       (deltaTime) => this.update(deltaTime),
       TIME_STEP,
@@ -106,7 +114,12 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
 
     this.state.players.set(client.sessionId, player);
 
-    this.tryStartCountdown();
+    // First player becomes room owner
+    if (this.state.players.size === 1) {
+      this.state.ownerId = client.sessionId;
+    }
+
+    // No auto-start — wait for all players to send "ready"
   }
 
   onLeave(client: Client, consented: boolean) {
@@ -152,8 +165,15 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       !this.state.matchStarted &&
       this.state.countdown === 0
     ) {
+      // All players must be ready
+      let allReady = true;
+      this.state.players.forEach((p) => {
+        if (!p.isReady) allReady = false;
+      });
+      if (!allReady) return;
+
       this.state.countdown = COUNTDOWN_SECONDS;
-      console.log(`🧨 Starting countdown: ${this.state.countdown}`);
+      console.log(`🧨 All ready — starting countdown: ${this.state.countdown}`);
 
       this.countdownInterval = setInterval(() => {
         this.state.countdown--;

@@ -11,7 +11,6 @@ import {
   PhoneOff,
   Users,
 } from "lucide-react";
-import { AIOverlayData } from "./BigOverlayBanner";
 import { speakCommentary, VoiceSettings } from "../services/voiceCommentary";
 import { useVoiceChat } from "../services/useVoiceChat";
 
@@ -60,8 +59,6 @@ interface Props {
   room: Room;
   nightMode: boolean;
   mySessionId?: string;
-  /** Called when an AI overlay fires so the parent can render it over the canvas */
-  onOverlay?: (overlay: AIOverlayData) => void;
   /** Voice commentary settings from App-level state */
   voiceSettings?: VoiceSettings;
 }
@@ -137,7 +134,6 @@ export const CommunicationHub: React.FC<Props> = ({
   room,
   nightMode,
   mySessionId,
-  onOverlay,
   voiceSettings,
 }) => {
   const [chat, setChat] = useState<ChatMsg[]>([]);
@@ -190,8 +186,8 @@ export const CommunicationHub: React.FC<Props> = ({
         spawnFloatingEmoji(event.emoji);
       }),
 
-      room.onMessage("ai_overlay", (overlay: AIOverlayData) => {
-        onOverlay?.(overlay);
+      room.onMessage("ai_overlay", (_overlay: any) => {
+        // Overlay removed — no-op handler kept to prevent unhandled message warnings
       }),
 
       room.onMessage(
@@ -223,7 +219,7 @@ export const CommunicationHub: React.FC<Props> = ({
       handlers.forEach((off) => typeof off === "function" && off());
       if (arenaTimerRef.current) clearTimeout(arenaTimerRef.current);
     };
-  }, [room, onOverlay]);
+  }, [room]);
 
   const spawnFloatingEmoji = useCallback((emoji: string) => {
     const id = `fe_${Date.now()}_${Math.random().toString(36).slice(2)}`;

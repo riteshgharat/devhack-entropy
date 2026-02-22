@@ -659,27 +659,7 @@ export const RedDynamiteGame: React.FC<RedDynamiteGameProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Waiting Overlay */}
-          {!gameState.matchStarted && gameState.countdown === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-10">
-              <div className="text-center text-white space-y-4">
-                <Users
-                  size={64}
-                  className="mx-auto text-indigo-400 animate-bounce"
-                />
-                <h2
-                  className="font-display text-3xl tracking-widest"
-                  style={{ textShadow: "4px 4px 0 #000" }}
-                >
-                  WAITING FOR PLAYERS
-                </h2>
-                <p className="font-body text-xl opacity-70">
-                  Need {2 - (gameState.players?.size || 0)} more player(s) to
-                  start
-                </p>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Leaderboard (Right Side) */}

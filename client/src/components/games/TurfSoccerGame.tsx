@@ -541,7 +541,7 @@ export const TurfSoccerGame: React.FC<TurfSoccerGameProps> = ({
       <div className="flex flex-col md:flex-row gap-4 w-full">
         {/* Game Canvas Container */}
         <div
-          className={`relative flex-1 aspect-[3/2] border-4 overflow-hidden ${nightMode ? "border-slate-700 bg-slate-900" : "border-slate-300 bg-slate-100"}`}
+          className={`relative flex-1 aspect-3/2 border-4 overflow-hidden ${nightMode ? "border-slate-700 bg-slate-900" : "border-slate-300 bg-slate-100"}`}
           style={{ imageRendering: "pixelated" }}
         >
           <canvas
@@ -617,27 +617,7 @@ export const TurfSoccerGame: React.FC<TurfSoccerGameProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Waiting Overlay */}
-          {!gameState?.matchStarted && (gameState?.countdown ?? 0) === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-md z-10">
-              <div className="text-center text-white space-y-4">
-                <Users
-                  size={64}
-                  className="mx-auto text-green-400 animate-bounce"
-                />
-                <h2
-                  className="font-display text-3xl tracking-widest"
-                  style={{ textShadow: "4px 4px 0 #000" }}
-                >
-                  WAITING FOR PLAYERS
-                </h2>
-                <p className="font-body text-xl opacity-70">
-                  Need {2 - (gameState?.players?.size || 0)} more player(s) to
-                  start
-                </p>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Leaderboard (Right Side) */}

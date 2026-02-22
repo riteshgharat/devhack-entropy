@@ -19,6 +19,7 @@ export class PlayerState extends Schema {
   @type("boolean") isBot: boolean = false;
   @type("number") score: number = 0;
   @type("number") facingX: number = 1;
+  @type("boolean") isReady: boolean = false;
 }
 
 export class TurfSoccerState extends Schema {
@@ -36,4 +37,5 @@ export class TurfSoccerState extends Schema {
   @type("string") roundState: string = "waiting"; // waiting, countdown, playing, goal
   @type("number") roundDelay: number = 0;
   @type("string") winnerId: string = "";
+  @type("string") ownerId: string = "";
 }

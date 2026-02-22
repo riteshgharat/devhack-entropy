@@ -839,6 +839,36 @@ export const PlayerProfileBadge: React.FC<{
     onEditProfile?: () => void;
 }> = ({ user, nightMode, onLogout, onEditProfile }) => {
     const [showMenu, setShowMenu] = useState(false);
+    const [liveWins, setLiveWins] = useState(user.wins);
+    const [liveMatches, setLiveMatches] = useState(user.matches);
+
+    // Fetch real wins/matches from backend on mount + when menu opens
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const headers: Record<string, string> = {};
+                if (import.meta.env.VITE_NGROK === 'true') {
+                    headers['ngrok-skip-browser-warning'] = 'true';
+                }
+                const playerId = localStorage.getItem('playerId');
+                if (!playerId) return;
+                const res = await fetch(
+                    `${import.meta.env.VITE_BACKEND_URL}/api/player/${playerId}`,
+                    { headers },
+                );
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.stats) {
+                        setLiveWins(data.stats.wins ?? user.wins);
+                        setLiveMatches(data.stats.matches ?? user.matches);
+                    }
+                }
+            } catch {
+                // Silently fall back to stored values
+            }
+        };
+        fetchStats();
+    }, [showMenu, user.wins, user.matches]);
 
     // XP progress calc
     const xpForNextLevel = user.level * 100;
@@ -942,18 +972,26 @@ export const PlayerProfileBadge: React.FC<{
                             </div>
 
                             {/* Stats row */}
-                            <div className={`grid grid-cols-2 gap-0 border-b-2 ${nightMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                            <div className={`grid grid-cols-3 gap-0 border-b-2 ${nightMode ? 'border-slate-700' : 'border-slate-100'}`}>
                                 <div className={`p-3 text-center border-r-2 ${nightMode ? 'border-slate-700' : 'border-slate-100'}`}>
                                     <p className={`font-display text-lg ${nightMode ? 'text-yellow-400' : 'text-yellow-600'}`}>
-                                        {user.wins}
+                                        {liveWins}
                                     </p>
                                     <p className={`font-display text-[7px] uppercase ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         Wins
                                     </p>
                                 </div>
+                                <div className={`p-3 text-center border-r-2 ${nightMode ? 'border-slate-700' : 'border-slate-100'}`}>
+                                    <p className={`font-display text-lg ${nightMode ? 'text-red-400' : 'text-red-600'}`}>
+                                        {liveMatches - liveWins}
+                                    </p>
+                                    <p className={`font-display text-[7px] uppercase ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                                        Losses
+                                    </p>
+                                </div>
                                 <div className="p-3 text-center">
                                     <p className={`font-display text-lg ${nightMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                        {user.matches}
+                                        {liveMatches}
                                     </p>
                                     <p className={`font-display text-[7px] uppercase ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         Matches

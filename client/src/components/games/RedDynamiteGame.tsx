@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { PixelCard } from "../PixelCard";
 import { PixelButton } from "../PixelButton";
 import { Trophy, Users } from "lucide-react";
+import { soundManager } from "../../services/soundManager";
 
 interface RedDynamiteGameProps {
   room: Room;
@@ -117,6 +118,14 @@ export const RedDynamiteGame: React.FC<RedDynamiteGameProps> = ({
       colorIndexRef.current++;
     }
     return playerColorsRef.current.get(sessionId)!;
+  }, []);
+
+  // ── Start hot-dynamic BGM on mount, revert to homepage on unmount ──
+  useEffect(() => {
+    soundManager.playBgm("hotdynamic");
+    return () => {
+      soundManager.playBgm("homepage");
+    };
   }, []);
 
   useEffect(() => {

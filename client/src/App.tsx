@@ -24,6 +24,7 @@ import { TurfSoccerGame } from "./components/games/TurfSoccerGame";
 import { CommunicationHub } from "./components/CommunicationHub";
 import { gameClient } from "./services/gameClient";
 import { Room } from "colyseus.js";
+import { soundManager } from "./services/soundManager";
 // DISABLED — Sarvam TTS voice commentary commented out
 // import {
 //   VoiceSettings,
@@ -232,6 +233,8 @@ function App() {
   const handleJoinRoom = (room: Room) => {
     setActiveRoom(room);
     setShowMultiplayer(false);
+    // Stop homepage music when entering a room (lobby / arena)
+    soundManager.stopBgm();
   };
 
   const handleLeaveRoom = () => {
@@ -240,6 +243,32 @@ function App() {
     setGameStarted(false);
     setShowArenaEntry(false);
   };
+
+  // ── BGM switching logic ──
+  // Homepage music when on home screen, game music when in-game, none during splash/lobby
+  React.useEffect(() => {
+    if (showSplash) return;                       // splash has its own audio
+    if (activeRoom && gameStarted) {
+      // Game-specific music is handled by the game components themselves
+      return;
+    }
+    // On home screen (no active room) → play homepage music
+    if (!activeRoom) {
+      soundManager.playBgm("homepage");
+    }
+  }, [showSplash, activeRoom, gameStarted]);
+
+  // Ensure we try to start homepage music on first user click (autoplay policy)
+  React.useEffect(() => {
+    const unlock = () => {
+      if (!showSplash && !activeRoom) {
+        soundManager.playBgm("homepage");
+      }
+      document.removeEventListener("click", unlock);
+    };
+    document.addEventListener("click", unlock);
+    return () => document.removeEventListener("click", unlock);
+  }, [showSplash, activeRoom]);
 
   if (showSplash) {
     return <SplashScreen onComplete={() => { sessionStorage.setItem("splashShown", "1"); setShowSplash(false); }} />;

@@ -23,6 +23,354 @@ interface PreGameLobbyProps {
 
 const MAX_PLAYERS = 8;
 
+/* ═══════════════════════════════════════════════════════
+   WASD Keys — pixel-art keyboard keys rendered inline
+   ═══════════════════════════════════════════════════════ */
+const WasdKeys: React.FC<{ nightMode: boolean }> = ({ nightMode }) => {
+  const keyClass = `inline-flex items-center justify-center w-8 h-8 border-2 border-b-4 font-display text-xs ${
+    nightMode
+      ? "bg-slate-700 border-slate-500 text-white"
+      : "bg-white border-slate-400 text-slate-800"
+  }`;
+  return (
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <div className={keyClass}>W</div>
+      <div className="flex gap-1">
+        <div className={keyClass}>A</div>
+        <div className={keyClass}>S</div>
+        <div className={keyClass}>D</div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════
+   Game-specific instruction panel (right side of lobby)
+   ═══════════════════════════════════════════════════════ */
+const GameInstructions: React.FC<{ roomName: string; nightMode: boolean }> = ({
+  roomName,
+  nightMode,
+}) => {
+  const hdr = `font-display text-xl uppercase tracking-wider flex items-center gap-2 ${
+    nightMode ? "text-yellow-400" : "text-amber-700"
+  }`;
+  const bar = `w-2 h-6 ${nightMode ? "bg-yellow-400" : "bg-amber-500"}`;
+  const ruleTag = `p-2 border font-display text-xs shrink-0 ${
+    nightMode
+      ? "bg-slate-800 border-slate-700 text-white"
+      : "bg-amber-100 border-amber-300 text-amber-800"
+  }`;
+  const ruleTitle = `font-display text-[11px] uppercase mb-1 ${
+    nightMode ? "text-white" : "text-amber-900"
+  }`;
+  const ruleBody = `font-sans text-xs ${
+    nightMode ? "text-slate-400" : "text-amber-700"
+  }`;
+  const tipBox = `mt-8 p-4 border ${
+    nightMode
+      ? "bg-yellow-400/10 border-yellow-400/20"
+      : "bg-amber-100/60 border-amber-400/40"
+  }`;
+  const tipDot = `animate-pulse w-2 h-2 rounded-full shrink-0 ${
+    nightMode
+      ? "bg-yellow-400 shadow-[0_0_8px_#facc15]"
+      : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
+  }`;
+  const tipText = `font-sans text-[11px] leading-relaxed italic ${
+    nightMode ? "text-yellow-100/80" : "text-amber-800"
+  }`;
+  const gridItem = (icon: string, label: string, color: string) => (
+    <div
+      key={label}
+      className={`p-2 flex items-center gap-2 border ${
+        nightMode
+          ? "bg-black/20 border-white/5"
+          : "bg-amber-100/50 border-amber-300/40"
+      }`}
+    >
+      <span className="text-xl">{icon}</span>
+      <span className={`font-display text-[9px] uppercase ${color}`}>{label}</span>
+    </div>
+  );
+  const subHeader = `font-display text-[11px] uppercase tracking-widest pb-2 border-b ${
+    nightMode ? "text-indigo-300 border-white/5" : "text-amber-600 border-amber-300/40"
+  }`;
+
+  /* ─── Red Dynamite / Hot Dynamite ─── */
+  if (roomName === "red_dynamite_room") {
+    return (
+      <div className="flex flex-col justify-between h-full">
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h3 className={hdr}>
+              <div className={bar} />
+              🧨 Hot Dynamite
+            </h3>
+
+            {/* Big dynamite graphic */}
+            <div className="flex justify-center py-2">
+              <motion.div
+                animate={{ rotate: [-5, 5, -5], scale: [1, 1.05, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                className="text-6xl select-none"
+              >
+                🧨
+              </motion.div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Controls */}
+              <div className="flex gap-4 items-center">
+                <WasdKeys nightMode={nightMode} />
+                <div>
+                  <p className={ruleTitle}>Movement</p>
+                  <p className={ruleBody}>
+                    Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to run around the island.
+                  </p>
+                </div>
+              </div>
+
+              {/* Timer rule */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>⏱️</div>
+                <div>
+                  <p className={ruleTitle}>Survive the Timer</p>
+                  <p className={ruleBody}>
+                    A countdown timer is ticking! When it hits zero, the player
+                    <strong> holding the bomb is eliminated</strong>. Stay away from the bomb holder!
+                  </p>
+                </div>
+              </div>
+
+              {/* Pass rule */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>💥</div>
+                <div>
+                  <p className={ruleTitle}>Bomb Passing</p>
+                  <p className={ruleBody}>
+                    Touch another player to <strong>pass the dynamite</strong> to them.
+                    Keep moving — don't get stuck holding it!
+                  </p>
+                </div>
+              </div>
+
+              {/* Last standing */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>🏆</div>
+                <div>
+                  <p className={ruleTitle}>Last One Standing</p>
+                  <p className={ruleBody}>
+                    Each round eliminates 1 player. The last player alive wins!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items grid */}
+          <div className="space-y-3">
+            <h4 className={subHeader}>Key Elements</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {gridItem("🧨", "Hot Dynamite", nightMode ? "text-red-300" : "text-red-600")}
+              {gridItem("⏱️", "Round Timer", nightMode ? "text-yellow-300" : "text-yellow-600")}
+              {gridItem("💀", "Elimination", nightMode ? "text-orange-300" : "text-orange-600")}
+              {gridItem("👑", "Last Alive Wins", nightMode ? "text-green-300" : "text-green-600")}
+            </div>
+          </div>
+        </div>
+
+        <div className={tipBox}>
+          <div className="flex items-center gap-3">
+            <div className={tipDot} />
+            <p className={tipText}>
+              "Pro Tip: Stay near the edge of the island — you'll have more escape routes when someone charges at you!"
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── Turf Soccer / Football ─── */
+  if (roomName === "turf_soccer_room") {
+    return (
+      <div className="flex flex-col justify-between h-full">
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h3 className={hdr}>
+              <div className={bar} />
+              ⚽ Turf Soccer
+            </h3>
+
+            {/* Big football graphic */}
+            <div className="flex justify-center py-2">
+              <motion.div
+                animate={{ y: [0, -12, 0], rotate: [0, 360] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                className="text-6xl select-none"
+              >
+                ⚽
+              </motion.div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Controls */}
+              <div className="flex gap-4 items-center">
+                <WasdKeys nightMode={nightMode} />
+                <div>
+                  <p className={ruleTitle}>Movement</p>
+                  <p className={ruleBody}>
+                    Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to move your player on the pitch.
+                  </p>
+                </div>
+              </div>
+
+              {/* Kick / Ball */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>⚽</div>
+                <div>
+                  <p className={ruleTitle}>Control the Ball</p>
+                  <p className={ruleBody}>
+                    Walk into the ball to <strong>kick it</strong>. The ball moves in the direction
+                    you're running. Coordinate with teammates!
+                  </p>
+                </div>
+              </div>
+
+              {/* Goal */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>🥅</div>
+                <div>
+                  <p className={ruleTitle}>Score Goals</p>
+                  <p className={ruleBody}>
+                    Push the ball into the <strong>opponent's goal</strong> to score a point.
+                    The team with the most goals at the end wins!
+                  </p>
+                </div>
+              </div>
+
+              {/* Teams */}
+              <div className="flex gap-4 items-start">
+                <div className={ruleTag}>👥</div>
+                <div>
+                  <p className={ruleTitle}>Team Play</p>
+                  <p className={ruleBody}>
+                    Players are split into two teams. Work together to
+                    dominate the pitch!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Items grid */}
+          <div className="space-y-3">
+            <h4 className={subHeader}>Key Elements</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {gridItem("⚽", "Soccer Ball", nightMode ? "text-white" : "text-slate-700")}
+              {gridItem("🥅", "Goal Post", nightMode ? "text-yellow-300" : "text-yellow-600")}
+              {gridItem("🏃", "Dribble & Kick", nightMode ? "text-blue-300" : "text-blue-600")}
+              {gridItem("🏆", "Most Goals Wins", nightMode ? "text-green-300" : "text-green-600")}
+            </div>
+          </div>
+        </div>
+
+        <div className={tipBox}>
+          <div className="flex items-center gap-3">
+            <div className={tipDot} />
+            <p className={tipText}>
+              "Pro Tip: Don't all chase the ball — stay in position and wait for the right pass!"
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── Grass Collect (default / arena_room) ─── */
+  return (
+    <div className="flex flex-col justify-between h-full">
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <h3 className={hdr}>
+            <div className={bar} />
+            🌿 Grass Collect
+          </h3>
+
+          {/* Big grass graphic */}
+          <div className="flex justify-center py-2">
+            <motion.div
+              animate={{ rotate: [-3, 3, -3], y: [0, -4, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="text-6xl select-none"
+            >
+              🌿
+            </motion.div>
+          </div>
+
+          <div className="space-y-4">
+            {/* Controls */}
+            <div className="flex gap-4 items-center">
+              <WasdKeys nightMode={nightMode} />
+              <div>
+                <p className={ruleTitle}>Movement</p>
+                <p className={ruleBody}>
+                  Use <strong>WASD</strong> or <strong>Arrow Keys</strong> to move around the arena and
+                  collect grass tiles.
+                </p>
+              </div>
+            </div>
+
+            {/* Scoring */}
+            <div className="flex gap-4 items-start">
+              <div className={ruleTag}>SC</div>
+              <div>
+                <p className={ruleTitle}>Score Points</p>
+                <p className={ruleBody}>
+                  Walk over grass tiles to <strong>cut &amp; collect</strong> them. Each tile earns you points.
+                  The player with the most grass wins!
+                </p>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="flex gap-4 items-start">
+              <div className={ruleTag}>❗</div>
+              <div>
+                <p className={ruleTitle}>Hidden Items</p>
+                <p className={ruleBody}>
+                  Some grass hides <strong>bombs, rockets &amp; speed boosters</strong>.
+                  They reveal when you cut the big grass down!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Power-ups grid */}
+        <div className="space-y-3">
+          <h4 className={subHeader}>Power-Ups & Hazards</h4>
+          <div className="grid grid-cols-2 gap-3">
+            {gridItem("💣", "Bomb Trap", nightMode ? "text-red-300" : "text-red-600")}
+            {gridItem("🚀", "Nuke Rocket", nightMode ? "text-orange-300" : "text-orange-600")}
+            {gridItem("⚡", "Super Speed", nightMode ? "text-yellow-300" : "text-yellow-600")}
+            {gridItem("🌿", "Double Grass", nightMode ? "text-green-300" : "text-green-600")}
+          </div>
+        </div>
+      </div>
+
+      <div className={tipBox}>
+        <div className="flex items-center gap-3">
+          <div className={tipDot} />
+          <p className={tipText}>
+            "Pro Tip: Use the Rocket only when opponents are about to clear a large patch!"
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const PreGameLobby: React.FC<PreGameLobbyProps> = ({
   room,
   nightMode,
@@ -377,7 +725,7 @@ export const PreGameLobby: React.FC<PreGameLobbyProps> = ({
           </div>
         </div>
 
-        {/* ── RIGHT: Game Rules ── */}
+        {/* ── RIGHT: Game Rules (dynamic per game type) ── */}
         <div
           className={`border-4 p-6 flex flex-col justify-between ${
             nightMode
@@ -385,144 +733,7 @@ export const PreGameLobby: React.FC<PreGameLobbyProps> = ({
               : "bg-amber-50/80 border-amber-400/50"
           }`}
         >
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <h3
-                className={`font-display text-xl uppercase tracking-wider flex items-center gap-2 ${
-                  nightMode ? "text-yellow-400" : "text-amber-700"
-                }`}
-              >
-                <div
-                  className={`w-2 h-6 ${
-                    nightMode ? "bg-yellow-400" : "bg-amber-500"
-                  }`}
-                />
-                How to Play
-              </h3>
-
-              <div className="space-y-4">
-                <div className="flex gap-4 items-start">
-                  <div
-                    className={`p-2 border font-display text-xs shrink-0 ${
-                      nightMode
-                        ? "bg-slate-800 border-slate-700 text-white"
-                        : "bg-amber-100 border-amber-300 text-amber-800"
-                    }`}
-                  >
-                    MV
-                  </div>
-                  <div>
-                    <p
-                      className={`font-display text-[11px] uppercase mb-1 ${
-                        nightMode ? "text-white" : "text-amber-900"
-                      }`}
-                    >
-                      Movement
-                    </p>
-                    <p
-                      className={`font-sans text-xs ${
-                        nightMode ? "text-slate-400" : "text-amber-700"
-                      }`}
-                    >
-                      Use WASD or Arrow Keys to move around the arena and
-                      collect tiles.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-4 items-start">
-                  <div
-                    className={`p-2 border font-display text-xs shrink-0 ${
-                      nightMode
-                        ? "bg-slate-800 border-slate-700 text-white"
-                        : "bg-amber-100 border-amber-300 text-amber-800"
-                    }`}
-                  >
-                    SC
-                  </div>
-                  <div>
-                    <p
-                      className={`font-display text-[11px] uppercase mb-1 ${
-                        nightMode ? "text-white" : "text-amber-900"
-                      }`}
-                    >
-                      Score Points
-                    </p>
-                    <p
-                      className={`font-sans text-xs ${
-                        nightMode ? "text-slate-400" : "text-amber-700"
-                      }`}
-                    >
-                      Collect grass tiles, score goals, or survive longest
-                      depending on the game mode.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Power-ups grid */}
-            <div className="space-y-3">
-              <h4
-                className={`font-display text-[11px] uppercase tracking-widest pb-2 border-b ${
-                  nightMode
-                    ? "text-indigo-300 border-white/5"
-                    : "text-amber-600 border-amber-300/40"
-                }`}
-              >
-                Power-Ups & Hazards
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { icon: "💣", label: "Bomb Trap", color: nightMode ? "text-red-300" : "text-red-600" },
-                  { icon: "🚀", label: "Nuke Rocket", color: nightMode ? "text-orange-300" : "text-orange-600" },
-                  { icon: "⚡", label: "Super Speed", color: nightMode ? "text-yellow-300" : "text-yellow-600" },
-                  { icon: "🌿", label: "Double Grass", color: nightMode ? "text-green-300" : "text-green-600" },
-                ].map(({ icon, label, color }) => (
-                  <div
-                    key={label}
-                    className={`p-2 flex items-center gap-2 border ${
-                      nightMode
-                        ? "bg-black/20 border-white/5"
-                        : "bg-amber-100/50 border-amber-300/40"
-                    }`}
-                  >
-                    <span className="text-xl">{icon}</span>
-                    <span className={`font-display text-[9px] uppercase ${color}`}>
-                      {label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Pro tip */}
-          <div
-            className={`mt-8 p-4 border ${
-              nightMode
-                ? "bg-yellow-400/10 border-yellow-400/20"
-                : "bg-amber-100/60 border-amber-400/40"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`animate-pulse w-2 h-2 rounded-full shrink-0 ${
-                  nightMode
-                    ? "bg-yellow-400 shadow-[0_0_8px_#facc15]"
-                    : "bg-amber-500 shadow-[0_0_8px_#f59e0b]"
-                }`}
-              />
-              <p
-                className={`font-sans text-[11px] leading-relaxed italic ${
-                  nightMode ? "text-yellow-100/80" : "text-amber-800"
-                }`}
-              >
-                "Pro Tip: Use the Rocket only when opponents are about to clear
-                a large patch!"
-              </p>
-            </div>
-          </div>
+          <GameInstructions roomName={room.name} nightMode={nightMode} />
         </div>
       </motion.div>
     </div>

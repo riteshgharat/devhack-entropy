@@ -1,6 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
+import characterSlamSrc from "../assets/character slam.mpeg";
+import suspenseSrc from "../assets/suspense.mpeg";
+import titleSlamSrc from "../assets/titleslam.mpeg";
+import splashOutSrc from "../assets/splash out.mpeg";
+
+/** Play a one-shot audio clip (no loop, stops previous instance if given). */
+const playOneShot = (src: string, volume = 0.7): HTMLAudioElement => {
+  const a = new Audio(src);
+  a.volume = volume;
+  a.play().catch(() => {});
+  return a;
+};
+
 /* ── Pixel Stickman (enhanced with weapon/accessory) ── */
 interface StickmanProps {
   color: string;
@@ -507,27 +520,58 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete }) => {
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = [];
+    const audioRefs: HTMLAudioElement[] = [];
+
+    // Phase 1 (800ms): Characters slam in → play character slam sound
     timers.push(
       setTimeout(() => {
         setPhase(1);
         setShakeKeyChars((k) => k + 1);
+        audioRefs.push(playOneShot(characterSlamSrc, 0.8));
       }, 800),
     );
+
+    // Phase 2 (2600ms): More characters enter → start suspense music
     timers.push(
       setTimeout(() => {
         setPhase(2);
         triggerCombo("ALL FIGHTERS READY!");
+        // Stop character slam, start suspense between the two slams
+        audioRefs.forEach((a) => { a.pause(); a.currentTime = 0; });
+        audioRefs.length = 0;
+        audioRefs.push(playOneShot(suspenseSrc, 0.6));
       }, 2600),
     );
+
+    // Phase 3 (5000ms): Title slams in → stop suspense, play title slam
     timers.push(
       setTimeout(() => {
         setPhase(3);
         setShakeKeyTitle((k) => k + 1);
+        // Stop suspense before title slam
+        audioRefs.forEach((a) => { a.pause(); a.currentTime = 0; });
+        audioRefs.length = 0;
+        audioRefs.push(playOneShot(titleSlamSrc, 0.85));
       }, 5000),
     );
-    timers.push(setTimeout(() => setPhase(4), 7500));
+
+    // Phase 4 (7500ms): Zoom out / splash out → stop title slam, play splash out
+    timers.push(
+      setTimeout(() => {
+        setPhase(4);
+        audioRefs.forEach((a) => { a.pause(); a.currentTime = 0; });
+        audioRefs.length = 0;
+        audioRefs.push(playOneShot(splashOutSrc, 0.8));
+      }, 7500),
+    );
+
     timers.push(setTimeout(() => memoizedOnComplete(), 8800));
-    return () => timers.forEach(clearTimeout);
+
+    return () => {
+      timers.forEach(clearTimeout);
+      // Clean up any playing audio on unmount
+      audioRefs.forEach((a) => { a.pause(); a.currentTime = 0; });
+    };
   }, [memoizedOnComplete]);
 
   return (

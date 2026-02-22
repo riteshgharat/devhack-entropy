@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { PixelStickman, STICKMAN_COLORS } from './PixelCharacter';
+import { soundManager } from '../services/soundManager';
 
 interface PixelButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'accent' | 'danger';
@@ -63,8 +64,12 @@ export const PixelButton = ({
         onMouseLeave={() => setIsHovered(false)}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        onClick={(e) => {
+          soundManager.playClick();
+          if (props.onClick) (props.onClick as React.MouseEventHandler<HTMLButtonElement>)(e);
+        }}
         className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${props.disabled ? 'opacity-50 cursor-not-allowed grayscale pointer-events-none' : ''} ${className}`}
-        {...(props as any)}
+        {...(({ onClick: _, ...rest }) => rest)(props as any)}
       >
         <span className="relative z-10">{children}</span>
       </motion.button>

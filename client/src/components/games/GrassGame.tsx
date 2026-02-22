@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { PixelCard } from "../PixelCard";
 import { PixelButton } from "../PixelButton";
 import { Trophy, Users } from "lucide-react";
+import { soundManager } from "../../services/soundManager";
 
 interface GrassGameProps {
   room: Room;
@@ -217,6 +218,15 @@ export const GrassGame: React.FC<GrassGameProps> = ({
       colorIndexRef.current++;
     }
     return playerColorsRef.current.get(sessionId)!;
+  }, []);
+
+  // ── Start grass-game BGM on mount, revert to homepage on unmount ──
+  useEffect(() => {
+    soundManager.playBgm("grassgame");
+    return () => {
+      // When leaving the game, switch back to homepage
+      soundManager.playBgm("homepage");
+    };
   }, []);
 
   useEffect(() => {

@@ -836,7 +836,8 @@ export const PlayerProfileBadge: React.FC<{
     user: UserProfile;
     nightMode: boolean;
     onLogout: () => void;
-}> = ({ user, nightMode, onLogout }) => {
+    onEditProfile?: () => void;
+}> = ({ user, nightMode, onLogout, onEditProfile }) => {
     const [showMenu, setShowMenu] = useState(false);
 
     // XP progress calc
@@ -960,8 +961,16 @@ export const PlayerProfileBadge: React.FC<{
                                 </div>
                             </div>
 
-                            {/* Logout button */}
-                            <div className="p-3">
+                            {/* Edit Profile + Logout buttons */}
+                            <div className="p-3 space-y-2">
+                                {onEditProfile && (
+                                    <PixelButton variant="secondary" size="sm" className="w-full text-[10px]" onClick={() => {
+                                        setShowMenu(false);
+                                        onEditProfile();
+                                    }}>
+                                        ✏️ Edit Profile
+                                    </PixelButton>
+                                )}
                                 <PixelButton variant="danger" size="sm" className="w-full text-[10px]" onClick={() => {
                                     setShowMenu(false);
                                     onLogout();

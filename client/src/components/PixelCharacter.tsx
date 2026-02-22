@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
 /* Color palette — matches the splash screen stickmen */
-const STICKMAN_COLORS = [
+export const STICKMAN_COLORS = [
   { name: 'Red', hex: '#ef4444' },
   { name: 'Blue', hex: '#3b82f6' },
   { name: 'Green', hex: '#22c55e' },
@@ -19,20 +19,26 @@ interface PixelCharacterProps {
 }
 
 /* ── Same PixelStickman as splash screen ── */
-interface StickmanProps {
+export interface StickmanProps {
     color: string;
     eyeColor?: string;
     scale?: number;
     weapon?: 'sword' | 'shield' | 'none';
     crown?: boolean;
+    halfBody?: boolean;
+    pointing?: 'left' | 'right' | 'none';
+    swordState?: 'idle' | 'unsheathed' | 'unsheathing';
 }
 
-const PixelStickman: React.FC<StickmanProps> = ({
+export const PixelStickman: React.FC<StickmanProps> = ({
     color,
     eyeColor = '#fff',
     scale = 1,
     weapon = 'none',
     crown = false,
+    halfBody = false,
+    pointing = 'none',
+    swordState = 'idle',
 }) => {
     const s = (v: number) => `${v * scale}px`;
     return (
@@ -97,25 +103,59 @@ const PixelStickman: React.FC<StickmanProps> = ({
             </div>
 
             {/* Left Arm */}
-            <div className="absolute" style={{
-                top: s(26), left: s(-2), width: s(9), height: s(20),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
-                transformOrigin: 'top center',
-            }} />
+            <motion.div 
+                className="absolute" 
+                style={{
+                    top: s(26), left: s(-2), width: s(9), height: s(20),
+                    backgroundColor: color,
+                    border: `${s(2)} solid #111`,
+                    boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
+                    transformOrigin: 'top center',
+                }}
+                animate={
+                    pointing === 'left' ? { rotate: 90, x: -5 } : 
+                    swordState === 'unsheathing' ? { rotate: 120 } : 
+                    swordState === 'unsheathed' ? { rotate: 140 } : 
+                    { rotate: 0, x: 0 }
+                }
+            />
 
             {/* Right Arm */}
-            <div className="absolute" style={{
-                top: s(26), right: s(-2), width: s(9), height: s(20),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
-            }} />
+            <motion.div 
+                className="absolute" 
+                style={{
+                    top: s(26), right: s(-2), width: s(9), height: s(20),
+                    backgroundColor: color,
+                    border: `${s(2)} solid #111`,
+                    boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
+                    transformOrigin: 'top center',
+                }}
+                animate={
+                    pointing === 'right' ? { rotate: -90, x: 5 } : 
+                    swordState === 'unsheathing' ? { rotate: -40 } : 
+                    swordState === 'unsheathed' ? { rotate: -60 } : 
+                    { rotate: 0, x: 0 }
+                }
+            />
 
             {/* Weapon - Sword */}
             {weapon === 'sword' && (
-                <div className="absolute" style={{ top: s(18), right: s(-14), width: s(8), height: s(40), zIndex: 20 }}>
+                <motion.div 
+                    className="absolute" 
+                    style={{ 
+                        top: s(18), 
+                        right: s(-14), 
+                        width: s(8), 
+                        height: s(40), 
+                        zIndex: 20,
+                        transformOrigin: 'bottom center'
+                    }}
+                    animate={
+                        swordState === 'unsheathing' ? { y: [-20, -40], opacity: [0, 1], rotate: [45, 0] } :
+                        swordState === 'unsheathed' ? { y: -40, opacity: 1, scale: 1.2 } :
+                        { y: 0, opacity: 0, rotate: 45 }
+                    }
+                >
                     {/* Blade */}
                     <div style={{
                         position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
@@ -138,7 +178,7 @@ const PixelStickman: React.FC<StickmanProps> = ({
                         backgroundColor: '#92400e',
                         border: `${s(1)} solid #451a03`,
                     }} />
-                </div>
+                </motion.div>
             )}
 
             {/* Weapon - Shield */}
@@ -156,35 +196,40 @@ const PixelStickman: React.FC<StickmanProps> = ({
                 </div>
             )}
 
-            {/* Left Leg */}
-            <div className="absolute" style={{
-                top: s(52), left: s(11), width: s(11), height: s(26),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                filter: 'brightness(0.8)',
-            }} />
+            {/* Legs - Only if not half-body */}
+            {!halfBody && (
+                <>
+                    {/* Left Leg */}
+                    <div className="absolute" style={{
+                        top: s(52), left: s(11), width: s(11), height: s(26),
+                        backgroundColor: color,
+                        border: `${s(2)} solid #111`,
+                        filter: 'brightness(0.8)',
+                    }} />
 
-            {/* Right Leg */}
-            <div className="absolute" style={{
-                top: s(52), right: s(11), width: s(11), height: s(26),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                filter: 'brightness(0.8)',
-            }} />
+                    {/* Right Leg */}
+                    <div className="absolute" style={{
+                        top: s(52), right: s(11), width: s(11), height: s(26),
+                        backgroundColor: color,
+                        border: `${s(2)} solid #111`,
+                        filter: 'brightness(0.8)',
+                    }} />
 
-            {/* Boots */}
-            <div className="absolute" style={{
-                top: s(76), left: s(7), width: s(16), height: s(9),
-                backgroundColor: '#1c1917',
-                border: `${s(2)} solid #000`,
-                boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
-            }} />
-            <div className="absolute" style={{
-                top: s(76), right: s(7), width: s(16), height: s(9),
-                backgroundColor: '#1c1917',
-                border: `${s(2)} solid #000`,
-                boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
-            }} />
+                    {/* Boots */}
+                    <div className="absolute" style={{
+                        top: s(76), left: s(7), width: s(16), height: s(9),
+                        backgroundColor: '#1c1917',
+                        border: `${s(2)} solid #000`,
+                        boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
+                    }} />
+                    <div className="absolute" style={{
+                        top: s(76), right: s(7), width: s(16), height: s(9),
+                        backgroundColor: '#1c1917',
+                        border: `${s(2)} solid #000`,
+                        boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
+                    }} />
+                </>
+            )}
         </div>
     );
 };

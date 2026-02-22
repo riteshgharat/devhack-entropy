@@ -492,18 +492,12 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     <p className={`font-display text-[10px] uppercase mb-2 ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         Match Settings
                                     </p>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 justify-center">
                                         <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
                                             ? 'border-indigo-500 bg-indigo-900/50 text-indigo-300'
                                             : 'border-blue-400 bg-blue-100 text-blue-700'
                                             }`}>
                                             1v1
-                                        </button>
-                                        <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
-                                            ? 'border-slate-600 bg-slate-700 text-slate-400'
-                                            : 'border-slate-300 bg-white text-slate-500'
-                                            }`}>
-                                            2v2
                                         </button>
                                         <button className={`flex-1 py-1.5 border-2 font-display text-[9px] uppercase ${nightMode
                                             ? 'border-slate-600 bg-slate-700 text-slate-400'

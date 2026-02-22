@@ -48,6 +48,8 @@ const SPEED_COUNT = 5;
 export class GameRoom extends Room<GameState> {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private resetTimeout: ReturnType<typeof setTimeout> | null = null;
+  /** Tracks when each grass was converted from phase 1→2 (grass.id → timestamp) */
+  private grassConvertTime: Map<string, number> = new Map();
 
   async onCreate(options: any) {
     if (options.customRoomId) {
@@ -61,6 +63,15 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage("move", (client: Client, data: MoveInput) => {
       this.handleMove(client, data);
+    });
+
+    this.onMessage("ready", (client: Client) => {
+      const player = this.state.players.get(client.sessionId);
+      if (player && !this.state.matchStarted) {
+        player.isReady = !player.isReady;
+        console.log(`📣 ${player.displayName} is ${player.isReady ? "READY" : "NOT READY"}`);
+        this.tryStartCountdown();
+      }
     });
 
     this.setSimulationInterval((deltaTime: number) => {
@@ -88,6 +99,11 @@ export class GameRoom extends Room<GameState> {
 
     this.state.players.set(client.sessionId, player);
 
+    // First player becomes the owner
+    if (this.state.players.size === 1) {
+      this.state.ownerId = client.sessionId;
+    }
+
     console.log(
       `✅ ${player.displayName} joined | ` +
       `Session: ${client.sessionId} | ` +
@@ -111,6 +127,13 @@ export class GameRoom extends Room<GameState> {
       if (this.state.players.size < MIN_PLAYERS) {
         this.endMatch();
       }
+    } else {
+      // If owner left, reassign owner
+      if (this.state.ownerId === client.sessionId && this.state.players.size > 0) {
+        const nextOwner = this.state.players.keys().next().value;
+        this.state.ownerId = nextOwner || "";
+      }
+      this.tryStartCountdown();
     }
   }
 
@@ -175,7 +198,9 @@ export class GameRoom extends Room<GameState> {
         player.y = Math.max(PLAYER_RADIUS, Math.min(this.state.arenaBoundaryY - PLAYER_RADIUS, player.y));
       }
 
-      // ── TWO-PHASE GRASS COLLECTION ──
+      // ── TWO-PHASE GRASS COLLECTION (time-based delay) ──
+      const now = Date.now();
+
       for (let i = this.state.grasses.length - 1; i >= 0; i--) {
         const grass = this.state.grasses[i];
         const dx = player.x - grass.x;
@@ -186,10 +211,13 @@ export class GameRoom extends Room<GameState> {
 
         if (dist < collisionDist) {
           if (grass.phase === 1) {
-            // Phase 1 → Phase 2: Big grass becomes small grass
-            player.score += 1;
+            // Phase 1 → Phase 2: Big grass becomes small grass — 2 points
+            player.score += 2;
             grass.phase = 2;
-            // Broadcast that a big grass was collected
+
+            // Record conversion time — small grass won't be collectible for 500ms
+            this.grassConvertTime.set(grass.id, now);
+
             this.broadcast("grass_collected", {
               id: grass.id,
               x: grass.x,
@@ -197,9 +225,14 @@ export class GameRoom extends Room<GameState> {
               playerId: sessionId,
             });
           } else if (grass.phase === 2) {
-            // Phase 2: Small grass collected → remove it
+            // Only allow collection if 500ms has passed since conversion
+            const convertTime = this.grassConvertTime.get(grass.id) || 0;
+            if (now - convertTime < 500) continue; // still in cooldown
+
+            // Phase 2: Small grass collected → remove it — 1 point
             const powerUp = grass.powerUp;
             this.state.grasses.splice(i, 1);
+            this.grassConvertTime.delete(grass.id);
 
             if (powerUp === "bomb") {
               player.stunTimer = 3;
@@ -220,7 +253,6 @@ export class GameRoom extends Room<GameState> {
                 }
               }, 5000);
             }
-            // No powerUp = just a normal small grass, score +1
             player.score += 1;
 
             this.broadcast("small_grass_collected", {
@@ -244,12 +276,42 @@ export class GameRoom extends Room<GameState> {
 
   private tryStartCountdown() {
     if (this.state.matchStarted || this.countdownInterval) return;
-    if (this.state.players.size < MIN_PLAYERS) return;
+    
+    // Check if at least MIN_PLAYERS are in the room
+    if (this.state.players.size < MIN_PLAYERS) {
+      // If countdown was running and someone left, cancel it
+      return;
+    }
 
-    console.log(`⏳ Countdown starting...`);
+    // Check if everyone is ready
+    let allReady = true;
+    this.state.players.forEach(p => {
+      if (!p.isReady) allReady = false;
+    });
+
+    if (!allReady) {
+      // If countdown was starting but someone unreadied, cancel it (handled by checking interval existence)
+      return;
+    }
+
+    console.log(`⏳ Everyone is READY! Countdown starting...`);
     this.state.countdown = MATCH_COUNTDOWN;
 
     this.countdownInterval = setInterval(() => {
+      // Double check everyone is still ready during countdown
+      let stillReady = true;
+      this.state.players.forEach(p => {
+        if (!p.isReady) stillReady = false;
+      });
+
+      if (!stillReady || this.state.players.size < MIN_PLAYERS) {
+        console.log("⚠️ Countdown canceled: someone unreadied or left.");
+        if (this.countdownInterval) clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+        this.state.countdown = 0;
+        return;
+      }
+
       this.state.countdown--;
       console.log(`⏳ ${this.state.countdown}...`);
 
@@ -417,6 +479,7 @@ export class GameRoom extends Room<GameState> {
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
+      player.isReady = false; // Reset ready status for next match
       const spawn = CORNER_SPAWNS[spawnIdx % CORNER_SPAWNS.length];
       player.x = spawn.x;
       player.y = spawn.y;

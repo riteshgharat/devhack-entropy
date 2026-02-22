@@ -12,16 +12,28 @@ import { GameArena } from './components/GameArena';
 import { GrassGame } from './components/games/GrassGame';
 import { RedDynamiteGame } from './components/games/RedDynamiteGame';
 import { TurfSoccerGame } from './components/games/TurfSoccerGame';
+import { CommunicationHub } from './components/CommunicationHub';
+import { BigOverlayBanner, AIOverlayData } from './components/BigOverlayBanner';
 import { gameClient } from './services/gameClient';
 import { Room } from 'colyseus.js';
+import { VoiceSettings, loadVoiceSettings, saveVoiceSettings } from './services/voiceCommentary';
+import { Mic, MicOff } from 'lucide-react';
 
 function App() {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showSplash, setShowSplash] = React.useState(true);
   const [nightMode, setNightMode] = React.useState(true); // default NIGHT
   const [showMultiplayer, setShowMultiplayer] = React.useState(false);
+  const [lobbyInitialTab, setLobbyInitialTab] = React.useState<'leaderboard' | 'join' | 'create' | 'quick'>('quick');
   const [characterColor, setCharacterColor] = React.useState(localStorage.getItem('playerColor') || '#ef4444');
   const [activeRoom, setActiveRoom] = React.useState<Room | null>(null);
+  const [aiOverlay, setAiOverlay] = React.useState<AIOverlayData | null>(null);
+  const [voiceSettings, setVoiceSettings] = React.useState<VoiceSettings>(loadVoiceSettings);
+
+  // Persist voice settings whenever they change
+  React.useEffect(() => {
+    saveVoiceSettings(voiceSettings);
+  }, [voiceSettings]);
   const [displayName, setDisplayName] = React.useState(localStorage.getItem('displayName') || `Player_${Math.floor(Math.random() * 1000)}`);
   const [playerId] = React.useState(() => {
     let id = localStorage.getItem('playerId');
@@ -140,6 +152,11 @@ function App() {
     sessionStorage.removeItem('reconnectionToken');
   }, []);
 
+  // Reset AI overlay when the active room changes (avoids stale overlays between games)
+  React.useEffect(() => {
+    setAiOverlay(null);
+  }, [activeRoom?.roomId]);
+
   const handleJoinRoom = (room: Room) => {
     setActiveRoom(room);
     setShowMultiplayer(false);
@@ -159,37 +176,58 @@ function App() {
       <Background nightMode={nightMode} />
 
       {activeRoom ? (
-        <div className="relative z-10 flex-1">
-          <header className="pt-8 text-center relative">
-            <h1 className={`font-display text-4xl uppercase tracking-tighter ${nightMode ? 'text-indigo-300' : 'text-yellow-400'}`}>
+        <div className="relative z-10 flex-1 flex flex-col">
+          <header className="pt-6 pb-2 text-center relative shrink-0">
+            <h1 className={`font-display text-3xl uppercase tracking-tighter ${nightMode ? 'text-indigo-300' : 'text-yellow-400'}`}>
               CHAOS ARENA
             </h1>
-            <div className={`absolute top-8 right-8 font-display text-[10px] px-2 py-1 border-2 opacity-50 ${nightMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
+            <div className={`absolute top-6 right-4 font-display text-[10px] px-2 py-1 border-2 opacity-50 ${nightMode ? 'border-slate-700 text-slate-500' : 'border-slate-300 text-slate-400'}`}>
               ROOM: {activeRoom.roomId}
             </div>
           </header>
-          {activeRoom.name === "red_dynamite_room" ? (
-            <RedDynamiteGame
-              room={activeRoom}
-              nightMode={nightMode}
-              onLeave={handleLeaveRoom}
-              onNextGame={handleNextGame}
-            />
-          ) : activeRoom.name === "turf_soccer_room" ? (
-            <TurfSoccerGame
-              room={activeRoom}
-              nightMode={nightMode}
-              onLeave={handleLeaveRoom}
-              onNextGame={handleNextGame}
-            />
-          ) : (
-            <GrassGame
-              room={activeRoom}
-              nightMode={nightMode}
-              onLeave={handleLeaveRoom}
-              onNextGame={handleNextGame}
-            />
-          )}
+
+          {/* Game + Communication Hub side by side */}
+          <div className="flex flex-1 gap-2 px-2 pb-2 min-h-0 items-start overflow-auto">
+
+            {/* Game canvas area with AI overlay banner */}
+            <div className="relative flex-1 min-w-0">
+              <BigOverlayBanner overlay={aiOverlay} />
+              {activeRoom.name === "red_dynamite_room" ? (
+                <RedDynamiteGame
+                  room={activeRoom}
+                  nightMode={nightMode}
+                  onLeave={handleLeaveRoom}
+                  onNextGame={handleNextGame}
+                />
+              ) : activeRoom.name === "turf_soccer_room" ? (
+                <TurfSoccerGame
+                  room={activeRoom}
+                  nightMode={nightMode}
+                  onLeave={handleLeaveRoom}
+                  onNextGame={handleNextGame}
+                />
+              ) : (
+                <GrassGame
+                  room={activeRoom}
+                  nightMode={nightMode}
+                  onLeave={handleLeaveRoom}
+                  onNextGame={handleNextGame}
+                />
+              )}
+            </div>
+
+            {/* Communication Hub sidebar */}
+            <div className="shrink-0" style={{ width: 256, minHeight: 480, maxHeight: '85vh', position: 'sticky', top: 0 }}>
+              <CommunicationHub
+                room={activeRoom}
+                nightMode={nightMode}
+                mySessionId={activeRoom.sessionId}
+                onOverlay={setAiOverlay}
+                voiceSettings={voiceSettings}
+              />
+            </div>
+
+          </div>
         </div>
       ) : (
         <>
@@ -287,7 +325,10 @@ function App() {
                 <PixelButton
                   size="lg"
                   className="w-64 text-xl tracking-widest animate-pulse"
-                  onClick={() => setShowMultiplayer(true)}
+                  onClick={() => {
+                    setLobbyInitialTab('quick');
+                    setShowMultiplayer(true);
+                  }}
                 >
                   Start Game
                 </PixelButton>
@@ -296,9 +337,24 @@ function App() {
                   variant="secondary"
                   size="md"
                   className="w-64"
-                  onClick={() => setShowMultiplayer(true)}
+                  onClick={() => {
+                    setLobbyInitialTab('quick');
+                    setShowMultiplayer(true);
+                  }}
                 >
                   Multiplayer
+                </PixelButton>
+
+                <PixelButton
+                  variant="accent"
+                  size="md"
+                  className="w-64"
+                  onClick={() => {
+                    setLobbyInitialTab('leaderboard');
+                    setShowMultiplayer(true);
+                  }}
+                >
+                  Global Leaderboard
                 </PixelButton>
 
                 <PixelButton
@@ -336,6 +392,7 @@ function App() {
             displayName={displayName}
             onClose={() => setShowMultiplayer(false)}
             onJoin={handleJoinRoom}
+            initialTab={lobbyInitialTab}
           />
         )}
       </AnimatePresence>
@@ -395,6 +452,78 @@ function App() {
                       : 'border-slate-300 bg-white text-slate-500 hover:border-slate-400'
                       }`}>Low</button>
                   </div>
+                </div>
+
+                {/* ── Voice Commentary ── */}
+                <div className="space-y-3">
+                  <label className={`font-display text-xs uppercase flex items-center gap-2 ${nightMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {voiceSettings.enabled ? <Mic size={14} /> : <MicOff size={14} />} AI Voice Commentary
+                  </label>
+
+                  <button
+                    onClick={() => setVoiceSettings(v => ({ ...v, enabled: !v.enabled }))}
+                    className={`w-full py-2 border-2 font-display text-xs uppercase transition-colors duration-300 ${
+                      voiceSettings.enabled
+                        ? (nightMode ? 'border-emerald-500 bg-emerald-900/40 text-emerald-300' : 'border-emerald-500 bg-emerald-50 text-emerald-700')
+                        : (nightMode ? 'border-slate-600 bg-slate-700 text-slate-400' : 'border-slate-300 bg-white text-slate-500')
+                    }`}
+                  >
+                    {voiceSettings.enabled ? '🎙️ Commentary ON' : '🔇 Commentary OFF'}
+                  </button>
+
+                  {voiceSettings.enabled && (
+                    <>
+                      <div>
+                        <p className={`font-display text-[10px] uppercase mb-1 ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>Language</p>
+                        <div className="flex gap-2">
+                          {(['en-IN', 'hi-IN'] as const).map(lang => (
+                            <button
+                              key={lang}
+                              onClick={() => setVoiceSettings(v => ({ ...v, language: lang }))}
+                              className={`flex-1 py-1.5 border-2 font-display text-xs uppercase transition-colors ${
+                                voiceSettings.language === lang
+                                  ? (nightMode ? 'border-indigo-400 bg-indigo-900/50 text-indigo-300' : 'border-indigo-500 bg-indigo-100 text-indigo-700')
+                                  : (nightMode ? 'border-slate-600 bg-slate-700 text-slate-400' : 'border-slate-200 bg-white text-slate-500')
+                              }`}
+                            >
+                              {lang === 'en-IN' ? '🇬🇧 English' : '🇮🇳 Hindi'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className={`font-display text-[10px] uppercase mb-1 ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>Host Voice</p>
+                        <div className="flex gap-2">
+                          {(['both', 'male', 'female'] as const).map(g => (
+                            <button
+                              key={g}
+                              onClick={() => setVoiceSettings(v => ({ ...v, gender: g }))}
+                              className={`flex-1 py-1.5 border-2 font-display text-xs uppercase transition-colors ${
+                                voiceSettings.gender === g
+                                  ? (nightMode ? 'border-purple-400 bg-purple-900/50 text-purple-300' : 'border-purple-500 bg-purple-100 text-purple-700')
+                                  : (nightMode ? 'border-slate-600 bg-slate-700 text-slate-400' : 'border-slate-200 bg-white text-slate-500')
+                              }`}
+                            >
+                              {g === 'both' ? '⚡ Duo' : g === 'male' ? '👨 Male' : '👩 Female'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className={`font-display text-[10px] uppercase mb-1 ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>Volume  {Math.round(voiceSettings.volume * 100)}%</p>
+                        <input
+                          type="range" min={0} max={1} step={0.05}
+                          value={voiceSettings.volume}
+                          onChange={e => setVoiceSettings(v => ({ ...v, volume: Number(e.target.value) }))}
+                          className={`w-full h-3 rounded-none appearance-none cursor-pointer ${
+                            nightMode ? 'accent-purple-500 bg-slate-600' : 'accent-purple-500 bg-slate-200'
+                          }`}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Theme toggle inside settings */}

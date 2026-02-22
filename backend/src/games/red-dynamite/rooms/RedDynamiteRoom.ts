@@ -1,4 +1,5 @@
 import { Room, Client } from "colyseus";
+import { RoomComms } from '../../../ai/roomComms';
 import { RedDynamiteState, PlayerState } from "../schemas/RedDynamiteState";
 import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
 
@@ -15,6 +16,7 @@ const PLAYER_SIZE = 32; // TILE_SIZE * 0.8
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 8;
 const COUNTDOWN_SECONDS = 3;
+const MATCH_DURATION = 60; // seconds - Game 2 duration
 const MATCH_RESET_DELAY = 5000;
 
 export class RedDynamiteRoom extends Room<RedDynamiteState> {
@@ -22,6 +24,9 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
   private countdownInterval?: NodeJS.Timeout;
   private resetTimeout?: NodeJS.Timeout;
   private _emptyRoomTimeout?: NodeJS.Timeout;
+  private comms!: RoomComms;
+  private dynamitePaused = false;
+  private dynamitePauseTimer = 0;
 
   onCreate(options: any) {
     this.maxClients = MAX_PLAYERS;
@@ -64,6 +69,10 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     });
 
     this.setSimulationInterval((deltaTime) => this.update(deltaTime), TIME_STEP);
+
+    // AI Game-Master & communication hub
+    this.comms = new RoomComms(this, 'red_dynamite');
+
     console.log(`🧨 Red Dynamite Room created: ${this.roomId}`);
   }
 
@@ -95,6 +104,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
 
   onLeave(client: Client, consented: boolean) {
     console.log(`🧨 Client left: ${client.sessionId}`);
+    this.comms.onClientLeave(client.sessionId);
 
     this.state.players.delete(client.sessionId);
 
@@ -158,6 +168,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     this.state.matchEnded = false;
     this.state.winnerId = "";
     this.state.maxTimer = 15;
+    this.state.matchTimer = MATCH_DURATION; // Initialize 60s match timer
     
     this.state.players.forEach((player) => {
       player.isAlive = true;
@@ -204,29 +215,75 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     this.state.roundDelay = 2.0; // 2 seconds delay
     
     let holderId = "";
+    let holderName = "";
     this.state.players.forEach((player, sessionId) => {
       if (player.hasDynamite && player.isAlive) {
         player.isAlive = false;
         player.hasDynamite = false;
         holderId = sessionId;
+        holderName = player.displayName;
       } else if (player.isAlive) {
         player.score += 10; // Points for surviving a round
       }
     });
 
+    if (holderName) {
+      this.comms.addEvent(`💥 ${holderName} EXPLODED holding the dynamite!`);
+    }
+
     this.broadcast("explosion", { holderId });
     
     // Make next round faster
+    const oldTimer = this.state.maxTimer;
     this.state.maxTimer = Math.max(5, this.state.maxTimer - 3);
+    if (this.state.maxTimer < oldTimer) {
+      this.comms.addEvent(`Timer speeds up! Now only ${this.state.maxTimer.toFixed(0)}s`);
+    }
   }
 
   private update(deltaTime: number) {
+    // AI Game-Master tick
+    if (this.state.matchStarted && !this.state.matchEnded) {
+      this.comms.tick(deltaTime);
+      
+      // Apply AI arena events dynamically
+      const aiOutput = this.comms.getLatestOutput();
+      if (aiOutput?.arenaEvent) {
+        const event = aiOutput.arenaEvent;
+        if (event.type === 'slow_mo' && !this.dynamitePaused) {
+          this.dynamitePaused = true;
+          this.dynamitePauseTimer = 5; // Pause for 5 seconds
+          this.comms.addEvent('⏸️ DYNAMITE PAUSED! 5 second breather!');
+        }
+      }
+    }
+
     if (!this.state.matchStarted || this.state.matchEnded) return;
 
     const dt = deltaTime / 1000;
+    
+    // Decrement match timer
+    this.state.matchTimer -= dt;
+    if (this.state.matchTimer <= 0) {
+      this.state.matchTimer = 0;
+      this.endMatch();
+      return;
+    }
+    
+    // Handle dynamite pause timer
+    if (this.dynamitePaused) {
+      this.dynamitePauseTimer -= dt;
+      if (this.dynamitePauseTimer <= 0) {
+        this.dynamitePaused = false;
+        this.comms.addEvent('▶️ DYNAMITE ACTIVE AGAIN!');
+      }
+    }
 
     if (this.state.roundState === "playing") {
-      this.state.currentDynamiteTimer -= dt;
+      // Only decrement timer if dynamite is not paused
+      if (!this.dynamitePaused) {
+        this.state.currentDynamiteTimer -= dt;
+      }
       
       if (this.state.currentDynamiteTimer <= 0) {
         this.triggerExplosion();
@@ -286,12 +343,14 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
               p2.hasDynamite = true;
               p1.passCooldown = 0.5;
               p2.passCooldown = 0.5;
+              this.comms.addEvent(`${p1.displayName} passed dynamite to ${p2.displayName}`);
               this.broadcast("dynamite_passed", { from: id1, to: id2 });
             } else if (p2.hasDynamite && !p1.hasDynamite && p1.passCooldown <= 0 && p2.passCooldown <= 0) {
               p2.hasDynamite = false;
               p1.hasDynamite = true;
               p1.passCooldown = 0.5;
               p2.passCooldown = 0.5;
+              this.comms.addEvent(`${p2.displayName} passed dynamite to ${p1.displayName}`);
               this.broadcast("dynamite_passed", { from: id2, to: id1 });
             }
 

@@ -77,10 +77,11 @@ interface MultiplayerLobbyProps {
     displayName: string;
     onClose: () => void;
     onJoin: (room: any) => void;
+    initialTab?: LobbyTab;
 }
 
-export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, characterColor = '#ef4444', playerId, displayName, onClose, onJoin }) => {
-    const [activeTab, setActiveTab] = useState<LobbyTab>('leaderboard');
+export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = false, characterColor = '#ef4444', playerId, displayName, onClose, onJoin, initialTab = 'leaderboard' }) => {
+    const [activeTab, setActiveTab] = useState<LobbyTab>(initialTab);
     const [inviteCode, setInviteCode] = useState('');
     const [generatedCode, setGeneratedCode] = useState('');
     const [copied, setCopied] = useState(false);
@@ -487,7 +488,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                     </motion.div>
                                 )}
 
-                                {/* Match settings */}
+                                {/* Match settings
                                 <div className={`border-t-2 pt-3 mt-3 ${nightMode ? 'border-slate-600' : 'border-slate-200'}`}>
                                     <p className={`font-display text-[10px] uppercase mb-2 ${nightMode ? 'text-slate-500' : 'text-slate-400'}`}>
                                         Match Settings
@@ -512,7 +513,7 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({ nightMode = 
                                             FFA
                                         </button>
                                     </div>
-                                </div>
+                                </div> */}
                             </motion.div>
                         )}
                     </AnimatePresence>

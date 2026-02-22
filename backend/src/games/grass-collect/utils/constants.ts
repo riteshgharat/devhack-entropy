@@ -28,7 +28,7 @@ export const MATCH_COUNTDOWN = 3;
 export const MATCH_RESET_DELAY = 5000;
 
 /** Grass Collection Game Constants */
-export const MATCH_DURATION = 60; // seconds
+export const MATCH_DURATION = 60; // seconds (first game)
 export const GRASS_COUNT = 50; // total grass to spawn
 export const GRASS_RADIUS = 15;
 export const PLAYER_RADIUS = 15;

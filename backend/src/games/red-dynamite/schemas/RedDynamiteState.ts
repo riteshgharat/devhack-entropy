@@ -22,6 +22,7 @@ export class RedDynamiteState extends Schema {
   @type("boolean") matchStarted: boolean = false;
   @type("boolean") matchEnded: boolean = false;
   @type("number") countdown: number = 0;
+  @type("number") matchTimer: number = 0; // Time remaining in match (seconds)
   
   @type("string") roundState: string = "waiting"; // waiting, playing, explosionDelay
   @type("number") currentDynamiteTimer: number = 0;

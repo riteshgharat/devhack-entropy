@@ -1,4 +1,5 @@
 import { Room, Client, matchMaker } from "colyseus";
+import { RoomComms } from '../../../ai/roomComms';
 import { GameState } from "../schemas/GameState";
 import { PlayerState } from "../schemas/PlayerState";
 import { ItemState } from "../schemas/GrassState";
@@ -35,6 +36,7 @@ export class GameRoom extends Room<GameState> {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private resetTimeout: ReturnType<typeof setTimeout> | null = null;
   private playerCutTimers: Map<string, Map<string, number>> = new Map();
+  private comms!: RoomComms;
 
   // ───── Room lifecycle ────────────────────────────────────
 
@@ -91,7 +93,10 @@ export class GameRoom extends Room<GameState> {
       this.update(deltaTime);
     }, 1000 / TICK_RATE);
 
-    console.log(`���️  GameRoom created | Room ID: ${this.roomId}`);
+    // AI Game-Master & communication hub
+    this.comms = new RoomComms(this, 'grass');
+
+    console.log(`🏟️  GameRoom created | Room ID: ${this.roomId}`);
   }
 
   onJoin(client: Client, options: any) {
@@ -132,6 +137,7 @@ export class GameRoom extends Room<GameState> {
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
 
+    this.comms.onClientLeave(client.sessionId);
     console.log(
       `❌ ${player.displayName} left | Session: ${client.sessionId}`
     );
@@ -187,6 +193,11 @@ export class GameRoom extends Room<GameState> {
 
   private update(deltaTime: number) {
     const dt = deltaTime / 1000; // ms → seconds
+
+    // AI Game-Master tick
+    if (this.state.matchStarted && !this.state.matchEnded) {
+      this.comms.tick(deltaTime);
+    }
 
     if (!this.state.matchStarted || this.state.matchEnded) return;
 
@@ -251,6 +262,11 @@ export class GameRoom extends Room<GameState> {
             playerTimers?.set(key, now);
             if (this.state.grid[idx] === 0) {
               player.score += 10;
+              
+              // Track score milestones for AI commentary
+              if (player.score % 50 === 0 && player.score > 0) {
+                this.comms.addEvent(`${player.displayName} hits ${player.score} points!`);
+              }
             }
           }
         }
@@ -275,14 +291,20 @@ export class GameRoom extends Room<GameState> {
             if (item.timer <= 0) {
               item.active = false;
               // Explode: stun players nearby
+              let stunCount = 0;
               this.state.players.forEach((p, id) => {
                 const dx = p.x - item.x;
                 const dy = p.y - item.y;
                 if (Math.sqrt(dx * dx + dy * dy) < TILE_SIZE * 2) {
                   p.stunTimer = 2;
                   p.score = Math.max(0, p.score - 5);
+                  stunCount++;
+                  this.comms.addEvent(`${p.displayName} hit by mine (-5 pts, stunned)`);
                 }
               });
+              if (stunCount > 1) {
+                this.comms.addEvent(`MINE EXPLOSION! ${stunCount} players stunned`);
+              }
             }
           } else if (item.type === 'booster') {
             const dx = player.x - item.x;
@@ -290,6 +312,7 @@ export class GameRoom extends Room<GameState> {
             if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS + TILE_SIZE / 2) {
               item.active = false;
               player.speedMultiplier = 1.5;
+              this.comms.addEvent(`${player.displayName} grabbed speed booster!`);
               setTimeout(() => {
                 if (this.state.players.has(sessionId)) {
                   this.state.players.get(sessionId)!.speedMultiplier = 1;

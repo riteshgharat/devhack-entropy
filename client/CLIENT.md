@@ -10,12 +10,12 @@ The frontend is responsible for:
 ✔ Managing room connections  
 ✔ Rendering real-time leaderboard  
 ✔ Supporting multiple games modularly  
-✔ Running smoothly on mobile & desktop  
+✔ Running smoothly on mobile & desktop
 
 The frontend NEVER:
 ❌ Decides authoritative game results  
 ❌ Trusts local physics permanently  
-❌ Calculates final score  
+❌ Calculates final score
 
 Server is always authoritative.
 
@@ -42,23 +42,23 @@ Optional UI:
 client/
 
 ├── src/
-│   ├── games/
-│   │   ├── grass-collect/      (Currently Active)
-│   │   │     ├── GameArena.tsx (Canvas-based rendering)
-│   │   │     └── constants.ts
-│   │   │
-│   │   └── hot-dynamite/       (Planned)
-│   │         ├── ArenaLogic.ts
-│   │
-│   ├── components/
-│   │   ├── Lobby.tsx           (Multiplayer Room Selection)
-│   │   ├── Leaderboard.tsx     (Global & Match History)
-│   │   └── PlayerStats.tsx     (Browser-persistent stats)
-│   │
-│   ├── services/
-│   │   └── gameClient.ts       (Colyseus networking & Ngrok bypass)
-│   │
-│   └── App.tsx                 (Entry point & Identity management)
+│ ├── games/
+│ │ ├── grass-collect/ (Currently Active)
+│ │ │ ├── GameArena.tsx (Canvas-based rendering)
+│ │ │ └── constants.ts
+│ │ │
+│ │ └── hot-dynamite/ (Planned)
+│ │ ├── ArenaLogic.ts
+│ │
+│ ├── components/
+│ │ ├── Lobby.tsx (Multiplayer Room Selection)
+│ │ ├── Leaderboard.tsx (Global & Match History)
+│ │ └── PlayerStats.tsx (Browser-persistent stats)
+│ │
+│ ├── services/
+│ │ └── gameClient.ts (Colyseus networking & Ngrok bypass)
+│ │
+│ └── App.tsx (Entry point & Identity management)
 
 Each game mode is a self-contained logic within `GameArena.tsx` or a modular sub-folder.
 The current implementation uses a Canvas-based HUD-less approach with Framer Motion UI overlays.
@@ -140,7 +140,7 @@ Never allow drift.
 ## E️⃣ Interpolation (Other Players)
 
 Server sync rate: 20–30Hz  
-Client render rate: 60Hz  
+Client render rate: 60Hz
 
 For remote players:
 
@@ -166,12 +166,13 @@ ArenaScene Responsibilities:
 Server Event Example:
 
 {
-  type: "spawn_trap",
-  x: 400,
-  y: 200
+type: "spawn_trap",
+x: 400,
+y: 200
 }
 
 Frontend:
+
 - Spawn visual trap
 - Play sound
 - Animate effect
@@ -183,10 +184,12 @@ Physics authority still server-side.
 # 6️⃣ Input Handling
 
 Desktop:
+
 - WASD / Arrow Keys
 - Space for jump
 
 Mobile:
+
 - Virtual joystick
 - Tap to jump
 
@@ -230,7 +233,7 @@ Flow:
 Example:
 
 if (gameType === "arena") {
-   kaplay.go("arena")
+kaplay.go("arena")
 }
 
 Each game:
@@ -246,6 +249,7 @@ Each game:
 Target:
 
 60 FPS on:
+
 - Desktop
 - Mid-range mobile
 
@@ -348,7 +352,7 @@ Add later:
 ✔ Client-side prediction  
 ✔ Clean modular multi-game support  
 ✔ Real-time leaderboard updates  
-✔ Mobile & desktop compatibility  
+✔ Mobile & desktop compatibility
 
 ---
 

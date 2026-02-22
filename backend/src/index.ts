@@ -10,7 +10,12 @@ import { RedDynamiteRoom } from "./games/red-dynamite/rooms/RedDynamiteRoom";
 import { TurfSoccerRoom } from "./games/turf-soccer/rooms/TurfSoccerRoom";
 import { initRedis } from "./db/redis";
 import { initSQLite } from "./db/sqlite";
-import { getRecentMatches, getLeaderboard, getPlayerStats, updatePlayerName } from "./db/matchHistory";
+import {
+  getRecentMatches,
+  getLeaderboard,
+  getPlayerStats,
+  updatePlayerName,
+} from "./db/matchHistory";
 import { synthesizeSpeech, VoiceLanguage, VoiceGender } from "./ai/sarvamTTS";
 
 import cors from "cors";
@@ -87,19 +92,25 @@ app.post("/api/tts", async (req, res) => {
     gender?: VoiceGender;
   };
 
-  if (!text || typeof text !== 'string') {
+  if (!text || typeof text !== "string") {
     return res.status(400).json({ error: "text is required" });
   }
 
-  const lang: VoiceLanguage = language === 'hi-IN' ? 'hi-IN' : 'en-IN';
-  const gen: VoiceGender = gender === 'female' ? 'female' : 'male';
+  const lang: VoiceLanguage = language === "hi-IN" ? "hi-IN" : "en-IN";
+  const gen: VoiceGender = gender === "female" ? "female" : "male";
 
   try {
-    const result = await synthesizeSpeech({ text: text.slice(0, 500), language: lang, gender: gen });
+    const result = await synthesizeSpeech({
+      text: text.slice(0, 500),
+      language: lang,
+      gender: gen,
+    });
     res.json({ audio: result.audioBase64 });
   } catch (err: any) {
-    console.error('[TTS]', err?.message ?? err);
-    res.status(500).json({ error: "TTS generation failed", detail: err?.message });
+    console.error("[TTS]", err?.message ?? err);
+    res
+      .status(500)
+      .json({ error: "TTS generation failed", detail: err?.message });
   }
 });
 
@@ -108,8 +119,8 @@ const server = createServer(app);
 // ─── Colyseus game server ─────────────────────────────────
 const gameServer = new Server({
   transport: new WebSocketTransport({
-    server
-  })
+    server,
+  }),
 });
 
 // Register game rooms

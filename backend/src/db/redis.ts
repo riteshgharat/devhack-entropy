@@ -39,13 +39,17 @@ export function initRedis(): IORedis | null {
 
     // Attempt connection (non-blocking)
     redis.connect().catch((err) => {
-      console.warn(`⚠️  Redis unavailable: ${err.message}. Running without Redis.`);
+      console.warn(
+        `⚠️  Redis unavailable: ${err.message}. Running without Redis.`,
+      );
       redis = null;
     });
 
     return redis;
   } catch (err: any) {
-    console.warn(`⚠️  Redis init failed: ${err.message}. Running without Redis.`);
+    console.warn(
+      `⚠️  Redis init failed: ${err.message}. Running without Redis.`,
+    );
     return null;
   }
 }

@@ -32,6 +32,7 @@ Base URL: `http://localhost:3000` (dev) or your deployed host.
 Returns server status.
 
 **Response `200`**
+
 ```json
 {
   "name": "Chaos Arena",
@@ -47,6 +48,7 @@ Returns server status.
 Returns recent match history (up to 10 entries). Reads from Redis first; falls back to SQLite.
 
 **Response `200`**
+
 ```json
 {
   "matches": [
@@ -63,6 +65,7 @@ Returns recent match history (up to 10 entries). Reads from Redis first; falls b
 ```
 
 **Response `500`**
+
 ```json
 { "error": "Failed to fetch matches" }
 ```
@@ -74,6 +77,7 @@ Returns recent match history (up to 10 entries). Reads from Redis first; falls b
 Returns the top players based on wins and score. Reads from SQLite.
 
 **Response `200`**
+
 ```json
 {
   "leaderboard": [
@@ -89,6 +93,7 @@ Returns the top players based on wins and score. Reads from SQLite.
 ```
 
 **Response `500`**
+
 ```json
 { "error": "Failed to fetch leaderboard" }
 ```
@@ -100,6 +105,7 @@ Returns the top players based on wins and score. Reads from SQLite.
 Returns the stats for a specific player, including their global rank. Rank is calculated by counting players with more wins or the same wins and a higher score. Reads from SQLite.
 
 **Response `200`**
+
 ```json
 {
   "stats": {
@@ -114,11 +120,13 @@ Returns the stats for a specific player, including their global rank. Rank is ca
 ```
 
 **Response `404`**
+
 ```json
 { "error": "Player not found" }
 ```
 
 **Response `500`**
+
 ```json
 { "error": "Failed to fetch player stats" }
 ```
@@ -130,6 +138,7 @@ Returns the stats for a specific player, including their global rank. Rank is ca
 Updates or creates a persistent player record with a new display name. Used for syncing character names across devices.
 
 **Request Body**
+
 ```json
 {
   "playerId": "id_abc123",
@@ -138,6 +147,7 @@ Updates or creates a persistent player record with a new display name. Used for 
 ```
 
 **Response `200`**
+
 ```json
 {
   "success": true,
@@ -146,11 +156,13 @@ Updates or creates a persistent player record with a new display name. Used for 
 ```
 
 **Response `400`**
+
 ```json
 { "error": "Invalid playerId or displayName" }
 ```
 
 **Response `500`**
+
 ```json
 { "error": "Failed to update player name" }
 ```
@@ -167,26 +179,30 @@ All real-time communication uses the Colyseus WebSocket protocol.
 
 ### 2.1 Room: `arena_room`
 
-| Property | Value |
-|---|---|
-| Room type | `arena_room` |
-| Max clients | 8 |
-| Min to start | 2 |
-| Tick rate | 60 FPS |
-| Match countdown | 3 seconds |
+| Property               | Value                                |
+| ---------------------- | ------------------------------------ |
+| Room type              | `arena_room`                         |
+| Max clients            | 8                                    |
+| Min to start           | 2                                    |
+| Tick rate              | 60 FPS                               |
+| Match countdown        | 3 seconds                            |
 | Post-match reset delay | configurable via `MATCH_RESET_DELAY` |
 
 **Join Options** (sent via `joinOrCreate` options):
 
-| Field | Type | Description |
-|---|---|---|
-| `displayName` | `string` (optional) | Player display name. Defaults to `Player_<id>` |
-| `playerId` | `string` (optional) | Unique player ID. Defaults to `sessionId` |
-| `color` | `string` (optional) | Player color hex code. Defaults to a random color |
-| `customRoomId` | `string` (optional) | Custom room ID when creating a room |
+| Field          | Type                | Description                                       |
+| -------------- | ------------------- | ------------------------------------------------- |
+| `displayName`  | `string` (optional) | Player display name. Defaults to `Player_<id>`    |
+| `playerId`     | `string` (optional) | Unique player ID. Defaults to `sessionId`         |
+| `color`        | `string` (optional) | Player color hex code. Defaults to a random color |
+| `customRoomId` | `string` (optional) | Custom room ID when creating a room               |
 
 ```ts
-const room = await client.joinOrCreate("arena_room", { displayName: "MyName", playerId: "id_123", color: "#ef4444" });
+const room = await client.joinOrCreate("arena_room", {
+  displayName: "MyName",
+  playerId: "id_123",
+  color: "#ef4444",
+});
 ```
 
 ---
@@ -194,28 +210,30 @@ const room = await client.joinOrCreate("arena_room", { displayName: "MyName", pl
 ### 2.2 Client → Server Messages
 
 #### `move`
+
 Move the player in a direction. Server applies velocity authoritatively.
 
 ```json
 { "dx": 1, "dy": 0 }
 ```
 
-| Field | Type | Values |
-|---|---|---|
-| `dx` | `number` | `-1` (left), `0`, `1` (right) |
-| `dy` | `number` | `-1` (up), `0`, `1` (down) |
+| Field | Type     | Values                        |
+| ----- | -------- | ----------------------------- |
+| `dx`  | `number` | `-1` (left), `0`, `1` (right) |
+| `dy`  | `number` | `-1` (up), `0`, `1` (down)    |
 
 ---
 
 #### `updateName`
+
 Updates the player's display name for both the current session and persistent storage.
 
 ```
 "NewPlayerName" (sent as raw string)
 ```
 
-| Type | Max Length | Description |
-|---|---|---|
+| Type     | Max Length    | Description                                                               |
+| -------- | ------------- | ------------------------------------------------------------------------- |
 | `string` | 15 characters | The new name to display in the current game room and save to the backend. |
 
 ---
@@ -223,6 +241,7 @@ Updates the player's display name for both the current session and persistent st
 ### 2.3 Server → Client Messages
 
 #### `match_start`
+
 Fired when the match begins after countdown.
 
 ```json
@@ -232,6 +251,7 @@ Fired when the match begins after countdown.
 ---
 
 #### `player_eliminated`
+
 Fired when a player is eliminated.
 
 ```json
@@ -248,6 +268,7 @@ Elimination reasons: `fell out of bounds`, `hit by falling_block`, `hit by trap`
 ---
 
 #### `match_end`
+
 Fired when only one player remains or all are eliminated.
 
 ```json
@@ -262,6 +283,7 @@ Fired when only one player remains or all are eliminated.
 ---
 
 #### `match_reset`
+
 Fired after the post-match delay when the room resets for a new round.
 
 ```json
@@ -276,51 +298,51 @@ The full game state is automatically synced to all clients via Colyseus `@Schema
 
 #### `GameState`
 
-| Field | Type | Description |
-|---|---|---|
-| `players` | `MapSchema<PlayerState>` | Map of sessionId → player data |
-| `hazards` | `ArraySchema<HazardState>` | Active arena hazards |
-| `matchStarted` | `boolean` | Whether the match is running |
-| `matchEnded` | `boolean` | Whether the match has ended |
-| `matchTimer` | `float32` | Elapsed match time in seconds |
-| `aliveCount` | `uint8` | Number of alive players |
-| `countdown` | `uint8` | Pre-match countdown (3→0) |
-| `leaderId` | `string` | Session ID of current leader |
-| `weakestId` | `string` | Session ID of weakest player |
-| `winnerId` | `string` | Session ID of winner (post-match) |
-| `arenaBoundaryX` | `float32` | Current arena width (shrinks) |
-| `arenaBoundaryY` | `float32` | Current arena height (shrinks) |
-| `lastArenaEvent` | `string` | Last mutation label (`"block"`, `"boundary"`, `"rotate"`, `"speed"`, `"trap"`) |
+| Field            | Type                       | Description                                                                    |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------------ |
+| `players`        | `MapSchema<PlayerState>`   | Map of sessionId → player data                                                 |
+| `hazards`        | `ArraySchema<HazardState>` | Active arena hazards                                                           |
+| `matchStarted`   | `boolean`                  | Whether the match is running                                                   |
+| `matchEnded`     | `boolean`                  | Whether the match has ended                                                    |
+| `matchTimer`     | `float32`                  | Elapsed match time in seconds                                                  |
+| `aliveCount`     | `uint8`                    | Number of alive players                                                        |
+| `countdown`      | `uint8`                    | Pre-match countdown (3→0)                                                      |
+| `leaderId`       | `string`                   | Session ID of current leader                                                   |
+| `weakestId`      | `string`                   | Session ID of weakest player                                                   |
+| `winnerId`       | `string`                   | Session ID of winner (post-match)                                              |
+| `arenaBoundaryX` | `float32`                  | Current arena width (shrinks)                                                  |
+| `arenaBoundaryY` | `float32`                  | Current arena height (shrinks)                                                 |
+| `lastArenaEvent` | `string`                   | Last mutation label (`"block"`, `"boundary"`, `"rotate"`, `"speed"`, `"trap"`) |
 
 #### `PlayerState`
 
-| Field | Type | Description |
-|---|---|---|
-| `displayName` | `string` | Player display name |
-| `playerId` | `string` | Unique player ID |
-| `color` | `string` | Player color hex code |
-| `x` | `float32` | X position |
-| `y` | `float32` | Y position |
-| `velocityX` | `float32` | X velocity |
-| `velocityY` | `float32` | Y velocity |
-| `isAlive` | `boolean` | Whether player is still in the match |
-| `survivalTime` | `float32` | Seconds survived in current match |
+| Field          | Type      | Description                          |
+| -------------- | --------- | ------------------------------------ |
+| `displayName`  | `string`  | Player display name                  |
+| `playerId`     | `string`  | Unique player ID                     |
+| `color`        | `string`  | Player color hex code                |
+| `x`            | `float32` | X position                           |
+| `y`            | `float32` | Y position                           |
+| `velocityX`    | `float32` | X velocity                           |
+| `velocityY`    | `float32` | Y velocity                           |
+| `isAlive`      | `boolean` | Whether player is still in the match |
+| `survivalTime` | `float32` | Seconds survived in current match    |
 
 #### `HazardState`
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | `string` | Unique hazard ID |
-| `hazardType` | `string` | `falling_block`, `obstacle`, `speed_zone`, `trap` |
-| `x`, `y` | `float32` | Position |
-| `width`, `height` | `float32` | Hitbox size |
-| `velocityX`, `velocityY` | `float32` | Movement velocity |
-| `rotation` | `float32` | Current rotation angle |
-| `rotationSpeed` | `float32` | Degrees/second rotation |
-| `speedMultiplier` | `float32` | Speed modifier factor (speed_zone only) |
-| `targetPlayerId` | `string` | Targeted player session ID |
-| `lifetime` | `float32` | Remaining active lifetime (seconds) |
-| `active` | `boolean` | Whether still active |
+| Field                    | Type      | Description                                       |
+| ------------------------ | --------- | ------------------------------------------------- |
+| `id`                     | `string`  | Unique hazard ID                                  |
+| `hazardType`             | `string`  | `falling_block`, `obstacle`, `speed_zone`, `trap` |
+| `x`, `y`                 | `float32` | Position                                          |
+| `width`, `height`        | `float32` | Hitbox size                                       |
+| `velocityX`, `velocityY` | `float32` | Movement velocity                                 |
+| `rotation`               | `float32` | Current rotation angle                            |
+| `rotationSpeed`          | `float32` | Degrees/second rotation                           |
+| `speedMultiplier`        | `float32` | Speed modifier factor (speed_zone only)           |
+| `targetPlayerId`         | `string`  | Targeted player session ID                        |
+| `lifetime`               | `float32` | Remaining active lifetime (seconds)               |
+| `active`                 | `boolean` | Whether still active                              |
 
 ---
 
@@ -339,6 +361,7 @@ Both databases are **optional**. The game server runs fully without them.
 Override with: `SQLITE_PATH` env var.
 
 **Pragmas applied at startup:**
+
 ```sql
 PRAGMA journal_mode = WAL;
 ```
@@ -433,8 +456,8 @@ Override with: `REDIS_URL` env var.
 
 **Data Structure:**
 
-| Key | Type | Description |
-|---|---|---|
+| Key                   | Type   | Description                          |
+| --------------------- | ------ | ------------------------------------ |
 | `chaos:match_history` | `List` | Recent match results as JSON strings |
 
 **Write — `saveMatchResult()`**: Pushes result JSON to the head of the list and trims to last 100 entries.
@@ -470,14 +493,14 @@ LRANGE chaos:match_history 0 <limit-1>
 
 ## 4. Environment Variables
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | HTTP/WebSocket server port |
-| `SQLITE_PATH` | `./chaos_arena.db` | Path to the SQLite database file |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection URL |
-| `AI_API_KEY` | — | API key for AI provider (Phase 3) |
-| `AI_PROVIDER` | — | `groq`, `gemini`, or `openrouter` (Phase 3) |
-| `NODE_ENV` | `development` | Set to `production` to suppress verbose logs |
+| Variable      | Default                  | Description                                  |
+| ------------- | ------------------------ | -------------------------------------------- |
+| `PORT`        | `3000`                   | HTTP/WebSocket server port                   |
+| `SQLITE_PATH` | `./chaos_arena.db`       | Path to the SQLite database file             |
+| `REDIS_URL`   | `redis://localhost:6379` | Redis connection URL                         |
+| `AI_API_KEY`  | —                        | API key for AI provider (Phase 3)            |
+| `AI_PROVIDER` | —                        | `groq`, `gemini`, or `openrouter` (Phase 3)  |
+| `NODE_ENV`    | `development`            | Set to `production` to suppress verbose logs |
 
 ---
 
@@ -485,12 +508,12 @@ LRANGE chaos:match_history 0 <limit-1>
 
 Both databases are initialized at startup with full error handling. If unavailable:
 
-| Scenario | Behaviour |
-|---|---|
-| SQLite unavailable at startup | Warning logged, game runs without persistence |
-| Redis down at startup | Warning logged, game runs without cache |
-| SQLite write fails mid-match | Warning logged, match data lost (no crash) |
-| Redis write fails mid-match | Warning logged, falls back to SQLite on next read |
-| Both databases down | `GET /api/matches` returns `{ "matches": [] }` |
+| Scenario                      | Behaviour                                         |
+| ----------------------------- | ------------------------------------------------- |
+| SQLite unavailable at startup | Warning logged, game runs without persistence     |
+| Redis down at startup         | Warning logged, game runs without cache           |
+| SQLite write fails mid-match  | Warning logged, match data lost (no crash)        |
+| Redis write fails mid-match   | Warning logged, falls back to SQLite on next read |
+| Both databases down           | `GET /api/matches` returns `{ "matches": [] }`    |
 
 The main game loop (`GameRoom` tick, WebSocket messages, state sync) is **never blocked** by database operations. All DB calls are `async`/non-blocking and wrapped in `try/catch`.

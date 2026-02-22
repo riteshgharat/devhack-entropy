@@ -4,7 +4,9 @@ import path from "path";
 let db: Database.Database | null = null;
 let isConnected = false;
 
-const DB_PATH = process.env.SQLITE_PATH || path.join(process.cwd(), "./src/db/data/chaos_arena.db");
+const DB_PATH =
+  process.env.SQLITE_PATH ||
+  path.join(process.cwd(), "./src/db/data/chaos_arena.db");
 
 /**
  * Initialize SQLite database.
@@ -49,7 +51,9 @@ export function initSQLite(): Database.Database | null {
     console.log("🗃️  match_history table ready");
     return db;
   } catch (err: any) {
-    console.warn(`⚠️  SQLite unavailable: ${err.message}. Running without SQLite.`);
+    console.warn(
+      `⚠️  SQLite unavailable: ${err.message}. Running without SQLite.`,
+    );
     db = null;
     isConnected = false;
     return null;

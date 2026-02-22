@@ -14,15 +14,18 @@ export class GameClient {
 
   private getHeaders() {
     const headers: Record<string, string> = {};
-    if (import.meta.env.VITE_NGROK === 'true') {
-      headers['ngrok-skip-browser-warning'] = 'true';
+    if (import.meta.env.VITE_NGROK === "true") {
+      headers["ngrok-skip-browser-warning"] = "true";
     }
     return headers;
   }
 
   async joinOrCreate(roomName: string, options: any = {}) {
     try {
-      this.room = await this.client.joinOrCreate(roomName, { ...options, headers: this.getHeaders() });
+      this.room = await this.client.joinOrCreate(roomName, {
+        ...options,
+        headers: this.getHeaders(),
+      });
       return this.room;
     } catch (error) {
       console.error("Failed to join or create room:", error);
@@ -32,7 +35,10 @@ export class GameClient {
 
   async create(roomName: string, options: any = {}) {
     try {
-      this.room = await this.client.create(roomName, { ...options, headers: this.getHeaders() });
+      this.room = await this.client.create(roomName, {
+        ...options,
+        headers: this.getHeaders(),
+      });
       return this.room;
     } catch (error) {
       console.error("Failed to create room:", error);
@@ -42,7 +48,10 @@ export class GameClient {
 
   async join(roomId: string, options: any = {}) {
     try {
-      this.room = await this.client.joinById(roomId, { ...options, headers: this.getHeaders() });
+      this.room = await this.client.joinById(roomId, {
+        ...options,
+        headers: this.getHeaders(),
+      });
       return this.room;
     } catch (error) {
       console.error("Failed to join room:", error);
@@ -53,7 +62,10 @@ export class GameClient {
   /** Join a new room by ID without leaving the current one (caller handles old room) */
   async joinNew(roomId: string, options: any = {}) {
     try {
-      const newRoom = await this.client.joinById(roomId, { ...options, headers: this.getHeaders() });
+      const newRoom = await this.client.joinById(roomId, {
+        ...options,
+        headers: this.getHeaders(),
+      });
       this.room = newRoom;
       return newRoom;
     } catch (error) {

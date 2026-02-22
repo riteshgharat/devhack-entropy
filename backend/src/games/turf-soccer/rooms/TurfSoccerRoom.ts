@@ -1,6 +1,10 @@
 import { Room, Client } from "colyseus";
-import { RoomComms } from '../../../ai/roomComms';
-import { TurfSoccerState, PlayerState, BallState } from "../schemas/TurfSoccerState";
+import { RoomComms } from "../../../ai/roomComms";
+import {
+  TurfSoccerState,
+  PlayerState,
+  BallState,
+} from "../schemas/TurfSoccerState";
 import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
 
 // ─── Constants ──────────────────────────────────────────
@@ -82,10 +86,13 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
       }
     });
 
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime), TIME_STEP);
+    this.setSimulationInterval(
+      (deltaTime) => this.update(deltaTime),
+      TIME_STEP,
+    );
 
     // AI Game-Master & communication hub
-    this.comms = new RoomComms(this, 'turf_soccer');
+    this.comms = new RoomComms(this, "turf_soccer");
 
     console.log(`⚽ Turf Soccer Room created: ${this.roomId}`);
   }
@@ -98,7 +105,8 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
     const player = new PlayerState();
     player.playerId = options.playerId || client.sessionId;
-    player.displayName = options.displayName || `Player_${Math.floor(Math.random() * 1000)}`;
+    player.displayName =
+      options.displayName || `Player_${Math.floor(Math.random() * 1000)}`;
     player.color = options.color || "#ef4444";
     player.score = options?.previousScore ?? 0;
     player.isBot = false;
@@ -111,7 +119,9 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
     this.spawnHuman(player);
     this.state.players.set(client.sessionId, player);
-    console.log(`⚽ ${player.displayName} joined (Team ${player.team}) | Players: ${this.getHumanCount()}`);
+    console.log(
+      `⚽ ${player.displayName} joined (Team ${player.team}) | Players: ${this.getHumanCount()}`,
+    );
 
     this.tryStartCountdown();
   }
@@ -156,19 +166,25 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
   private getTeamHumanCount(team: number): number {
     let c = 0;
-    this.state.players.forEach(p => { if (p.team === team && !p.isBot) c++; });
+    this.state.players.forEach((p) => {
+      if (p.team === team && !p.isBot) c++;
+    });
     return c;
   }
 
   private getTeamTotalCount(team: number): number {
     let c = 0;
-    this.state.players.forEach(p => { if (p.team === team) c++; });
+    this.state.players.forEach((p) => {
+      if (p.team === team) c++;
+    });
     return c;
   }
 
   private getHumanCount(): number {
     let c = 0;
-    this.state.players.forEach(p => { if (!p.isBot) c++; });
+    this.state.players.forEach((p) => {
+      if (!p.isBot) c++;
+    });
     return c;
   }
 
@@ -214,14 +230,20 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
   private removeBots() {
     const botKeys: string[] = [];
-    this.state.players.forEach((p, key) => { if (p.isBot) botKeys.push(key); });
-    botKeys.forEach(k => this.state.players.delete(k));
+    this.state.players.forEach((p, key) => {
+      if (p.isBot) botKeys.push(key);
+    });
+    botKeys.forEach((k) => this.state.players.delete(k));
   }
 
   // ─── Match Flow ───────────────────────────────────────
 
   private tryStartCountdown() {
-    if (this.getHumanCount() >= MIN_PLAYERS && !this.state.matchStarted && this.state.countdown === 0) {
+    if (
+      this.getHumanCount() >= MIN_PLAYERS &&
+      !this.state.matchStarted &&
+      this.state.countdown === 0
+    ) {
       this.state.countdown = COUNTDOWN_SECONDS;
       this.countdownInterval = setInterval(() => {
         this.state.countdown--;
@@ -258,7 +280,9 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     this.state.countdown = COUNTDOWN_SECONDS;
 
     this.broadcast("match_start", { playerCount: this.state.players.size });
-    console.log(`⚽ Match started! ${this.state.players.size} entities on the pitch.`);
+    console.log(
+      `⚽ Match started! ${this.state.players.size} entities on the pitch.`,
+    );
   }
 
   private resetPositions() {
@@ -297,23 +321,36 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     else this.state.scoreTeam2++;
 
     // Award points to all players on the scoring team
-    this.state.players.forEach(p => {
+    this.state.players.forEach((p) => {
       if (p.team === teamId && !p.isBot) {
         p.score += POINTS_PER_GOAL;
       }
     });
 
-    this.broadcast("goal", { teamId, scoreTeam1: this.state.scoreTeam1, scoreTeam2: this.state.scoreTeam2 });
-    console.log(`⚽ GOAL! Team ${teamId} scores. ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`);
-    
+    this.broadcast("goal", {
+      teamId,
+      scoreTeam1: this.state.scoreTeam1,
+      scoreTeam2: this.state.scoreTeam2,
+    });
+    console.log(
+      `⚽ GOAL! Team ${teamId} scores. ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`,
+    );
+
     const scoreDiff = Math.abs(this.state.scoreTeam1 - this.state.scoreTeam2);
     if (scoreDiff === 0) {
-      this.comms.addEvent(`TIED GAME! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`);
+      this.comms.addEvent(
+        `TIED GAME! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`,
+      );
     } else if (scoreDiff >= 2) {
-      const leadingTeam = this.state.scoreTeam1 > this.state.scoreTeam2 ? 'Red' : 'Blue';
-      this.comms.addEvent(`${leadingTeam} Team dominating ${this.state.scoreTeam1}-${this.state.scoreTeam2}!`);
+      const leadingTeam =
+        this.state.scoreTeam1 > this.state.scoreTeam2 ? "Red" : "Blue";
+      this.comms.addEvent(
+        `${leadingTeam} Team dominating ${this.state.scoreTeam1}-${this.state.scoreTeam2}!`,
+      );
     } else {
-      this.comms.addEvent(`Team ${teamId} SCORES! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`);
+      this.comms.addEvent(
+        `Team ${teamId} SCORES! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`,
+      );
     }
   }
 
@@ -411,7 +448,10 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     // Player-player collisions
     for (let i = 0; i < playerEntries.length; i++) {
       for (let j = i + 1; j < playerEntries.length; j++) {
-        this.checkPlayerPlayerCollision(playerEntries[i][1], playerEntries[j][1]);
+        this.checkPlayerPlayerCollision(
+          playerEntries[i][1],
+          playerEntries[j][1],
+        );
       }
     }
   }
@@ -430,12 +470,19 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     ball.y += ball.vy * dt;
 
     // Top/bottom walls
-    if (ball.y < BALL_RADIUS) { ball.y = BALL_RADIUS; ball.vy *= -0.8; }
-    if (ball.y > FIELD_HEIGHT - BALL_RADIUS) { ball.y = FIELD_HEIGHT - BALL_RADIUS; ball.vy *= -0.8; }
+    if (ball.y < BALL_RADIUS) {
+      ball.y = BALL_RADIUS;
+      ball.vy *= -0.8;
+    }
+    if (ball.y > FIELD_HEIGHT - BALL_RADIUS) {
+      ball.y = FIELD_HEIGHT - BALL_RADIUS;
+      ball.vy *= -0.8;
+    }
 
     // Left/right walls (excluding goal openings)
-    const inGoalY = ball.y > FIELD_CY - GOAL_HEIGHT / 2 + BALL_RADIUS &&
-                    ball.y < FIELD_CY + GOAL_HEIGHT / 2 - BALL_RADIUS;
+    const inGoalY =
+      ball.y > FIELD_CY - GOAL_HEIGHT / 2 + BALL_RADIUS &&
+      ball.y < FIELD_CY + GOAL_HEIGHT / 2 - BALL_RADIUS;
 
     if (ball.x < BALL_RADIUS) {
       if (!inGoalY || this.state.roundState !== "playing") {
@@ -453,8 +500,9 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
   private checkGoals() {
     const ball = this.state.ball;
-    const inGoalY = ball.y > FIELD_CY - GOAL_HEIGHT / 2 + BALL_RADIUS &&
-                    ball.y < FIELD_CY + GOAL_HEIGHT / 2 - BALL_RADIUS;
+    const inGoalY =
+      ball.y > FIELD_CY - GOAL_HEIGHT / 2 + BALL_RADIUS &&
+      ball.y < FIELD_CY + GOAL_HEIGHT / 2 - BALL_RADIUS;
 
     if (ball.x < 0 && inGoalY) {
       this.triggerGoal(2); // Team 2 scores in left goal
@@ -465,9 +513,15 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
 
   private checkBallBorder(dt: number) {
     const ball = this.state.ball;
-    const inGoalY = ball.y > FIELD_CY - GOAL_HEIGHT / 2 && ball.y < FIELD_CY + GOAL_HEIGHT / 2;
-    const nearLeftRight = ball.x < BALL_BORDER_THRESHOLD || ball.x > FIELD_WIDTH - BALL_BORDER_THRESHOLD;
-    const nearTopBottom = ball.y < BALL_BORDER_THRESHOLD || ball.y > FIELD_HEIGHT - BALL_BORDER_THRESHOLD;
+    const inGoalY =
+      ball.y > FIELD_CY - GOAL_HEIGHT / 2 &&
+      ball.y < FIELD_CY + GOAL_HEIGHT / 2;
+    const nearLeftRight =
+      ball.x < BALL_BORDER_THRESHOLD ||
+      ball.x > FIELD_WIDTH - BALL_BORDER_THRESHOLD;
+    const nearTopBottom =
+      ball.y < BALL_BORDER_THRESHOLD ||
+      ball.y > FIELD_HEIGHT - BALL_BORDER_THRESHOLD;
     const nearGoalOpening = nearLeftRight && inGoalY;
 
     if ((nearLeftRight || nearTopBottom) && !nearGoalOpening) {
@@ -548,7 +602,8 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     const distToBall = Math.hypot(ball.x - bot.x, ball.y - bot.y) || 1;
     const toBallX = (ball.x - bot.x) / distToBall;
 
-    const isBehind = (bot.team === 1 && toBallX < -0.2) || (bot.team === 2 && toBallX > 0.2);
+    const isBehind =
+      (bot.team === 1 && toBallX < -0.2) || (bot.team === 2 && toBallX > 0.2);
 
     if (isBehind && distToBall < 100) {
       approachX = ball.x - ntx * 80;
@@ -575,14 +630,20 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
       this.state.players.forEach((p, sid) => {
         if (p.team === 1 && !p.isBot) {
           p.score += POINTS_WIN_BONUS;
-          if (!winnerId) { winnerId = sid; winnerName = p.displayName; }
+          if (!winnerId) {
+            winnerId = sid;
+            winnerName = p.displayName;
+          }
         }
       });
     } else if (this.state.scoreTeam2 > this.state.scoreTeam1) {
       this.state.players.forEach((p, sid) => {
         if (p.team === 2 && !p.isBot) {
           p.score += POINTS_WIN_BONUS;
-          if (!winnerId) { winnerId = sid; winnerName = p.displayName; }
+          if (!winnerId) {
+            winnerId = sid;
+            winnerName = p.displayName;
+          }
         }
       });
     } else {
@@ -595,45 +656,62 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     console.log(
       isDraw
         ? `⚽ Draw! ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`
-        : `⚽ ${winnerName}'s team wins! ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`
+        : `⚽ ${winnerName}'s team wins! ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`,
     );
 
     this.broadcast("match_end", {
-      winnerId, winnerName,
+      winnerId,
+      winnerName,
       scoreTeam1: this.state.scoreTeam1,
       scoreTeam2: this.state.scoreTeam2,
       isDraw,
     });
 
-    const playerStatsToSave: { id: string, displayName: string, isWinner: boolean, score: number }[] = [];
+    const playerStatsToSave: {
+      id: string;
+      displayName: string;
+      isWinner: boolean;
+      score: number;
+    }[] = [];
     this.state.players.forEach((p, sid) => {
       if (!p.isBot) {
         playerStatsToSave.push({
           id: p.playerId || sid,
           displayName: p.displayName,
-          isWinner: !isDraw && ((this.state.scoreTeam1 > this.state.scoreTeam2 && p.team === 1) ||
-                                (this.state.scoreTeam2 > this.state.scoreTeam1 && p.team === 2)),
-          score: p.score
+          isWinner:
+            !isDraw &&
+            ((this.state.scoreTeam1 > this.state.scoreTeam2 && p.team === 1) ||
+              (this.state.scoreTeam2 > this.state.scoreTeam1 && p.team === 2)),
+          score: p.score,
         });
       }
     });
 
-    savePlayerStats(playerStatsToSave).catch(err => console.warn(`⚠️ ${err.message}`));
+    savePlayerStats(playerStatsToSave).catch((err) =>
+      console.warn(`⚠️ ${err.message}`),
+    );
     saveMatchResult({
       roomId: this.roomId,
-      winnerId, winnerName,
+      winnerId,
+      winnerName,
       playerCount: this.getHumanCount(),
       matchDuration: MATCH_DURATION - this.state.matchTimer,
       isDraw,
-    }).catch(err => console.warn(`⚠️ ${err.message}`));
+    }).catch((err) => console.warn(`⚠️ ${err.message}`));
 
     // After delay, create the next room for the chain (client will show final leaderboard)
     this.resetTimeout = setTimeout(async () => {
       try {
         const nextRoomId = this.roomId + "_gc";
         const { matchMaker } = await import("colyseus");
-        await matchMaker.createRoom("arena_room", { customRoomId: nextRoomId, isTransitionRoom: true });
-        this.broadcast("next_game", { roomId: nextRoomId, roomName: "arena_room" });
+        await matchMaker.createRoom("arena_room", {
+          customRoomId: nextRoomId,
+          isTransitionRoom: true,
+        });
+        this.broadcast("next_game", {
+          roomId: nextRoomId,
+          roomName: "arena_room",
+        });
       } catch (e) {
         console.error("Failed to create next room", e);
       }

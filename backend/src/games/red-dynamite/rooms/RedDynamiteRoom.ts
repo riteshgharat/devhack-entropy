@@ -1,5 +1,5 @@
 import { Room, Client } from "colyseus";
-import { RoomComms } from '../../../ai/roomComms';
+import { RoomComms } from "../../../ai/roomComms";
 import { RedDynamiteState, PlayerState } from "../schemas/RedDynamiteState";
 import { saveMatchResult, savePlayerStats } from "../../../db/matchHistory";
 
@@ -64,14 +64,19 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       const player = this.state.players.get(client.sessionId);
       if (player && name && name.length <= 15) {
         player.displayName = name;
-        console.log(`👤 Name update (RedDynamite): ${name} (${client.sessionId})`);
+        console.log(
+          `👤 Name update (RedDynamite): ${name} (${client.sessionId})`,
+        );
       }
     });
 
-    this.setSimulationInterval((deltaTime) => this.update(deltaTime), TIME_STEP);
+    this.setSimulationInterval(
+      (deltaTime) => this.update(deltaTime),
+      TIME_STEP,
+    );
 
     // AI Game-Master & communication hub
-    this.comms = new RoomComms(this, 'red_dynamite');
+    this.comms = new RoomComms(this, "red_dynamite");
 
     console.log(`🧨 Red Dynamite Room created: ${this.roomId}`);
   }
@@ -86,17 +91,19 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
 
     const player = new PlayerState();
     player.playerId = options.playerId || client.sessionId;
-    player.displayName = options.displayName || `Player_${Math.floor(Math.random() * 1000)}`;
+    player.displayName =
+      options.displayName || `Player_${Math.floor(Math.random() * 1000)}`;
     player.color = options.color || "#ef4444";
     // Carry over score from previous game so the leaderboard stays cumulative
     player.score = options?.previousScore ?? 0;
-    
+
     // Spawn in a circle
-    const angle = (this.state.players.size / MAX_PLAYERS) * Math.PI * 2 + Math.PI / 4;
+    const angle =
+      (this.state.players.size / MAX_PLAYERS) * Math.PI * 2 + Math.PI / 4;
     const spawnRadius = ISLAND_RADIUS * 0.7;
     player.x = CX + Math.cos(angle) * spawnRadius;
     player.y = CY + Math.sin(angle) * spawnRadius;
-    
+
     this.state.players.set(client.sessionId, player);
 
     this.tryStartCountdown();
@@ -140,7 +147,11 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
   }
 
   private tryStartCountdown() {
-    if (this.state.players.size >= MIN_PLAYERS && !this.state.matchStarted && this.state.countdown === 0) {
+    if (
+      this.state.players.size >= MIN_PLAYERS &&
+      !this.state.matchStarted &&
+      this.state.countdown === 0
+    ) {
       this.state.countdown = COUNTDOWN_SECONDS;
       console.log(`🧨 Starting countdown: ${this.state.countdown}`);
 
@@ -169,7 +180,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     this.state.winnerId = "";
     this.state.maxTimer = 15;
     this.state.matchTimer = MATCH_DURATION; // Initialize 60s match timer
-    
+
     this.state.players.forEach((player) => {
       player.isAlive = true;
       player.hasDynamite = false;
@@ -177,7 +188,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       // score is NOT reset here — it carries over from previousScore set in onJoin
       player.velocityX = 0;
       player.velocityY = 0;
-      
+
       // Respawn in circle
       const angle = Math.random() * Math.PI * 2;
       const spawnRadius = ISLAND_RADIUS * 0.7;
@@ -186,24 +197,29 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     });
 
     this.startRound();
-    console.log(`🧨 Match started! ${this.state.players.size} players in the arena.`);
+    console.log(
+      `🧨 Match started! ${this.state.players.size} players in the arena.`,
+    );
     this.broadcast("match_start", { playerCount: this.state.players.size });
   }
 
   private startRound() {
-    const alivePlayers = Array.from(this.state.players.values()).filter(p => p.isAlive);
-    
+    const alivePlayers = Array.from(this.state.players.values()).filter(
+      (p) => p.isAlive,
+    );
+
     if (alivePlayers.length <= 1) {
       this.endMatch();
       return;
     }
 
-    alivePlayers.forEach(p => {
+    alivePlayers.forEach((p) => {
       p.hasDynamite = false;
       p.passCooldown = 1.0; // 1 second cooldown at start of round
     });
 
-    const randomPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    const randomPlayer =
+      alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
     randomPlayer.hasDynamite = true;
 
     this.state.currentDynamiteTimer = this.state.maxTimer;
@@ -213,7 +229,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
   private triggerExplosion() {
     this.state.roundState = "explosionDelay";
     this.state.roundDelay = 2.0; // 2 seconds delay
-    
+
     let holderId = "";
     let holderName = "";
     this.state.players.forEach((player, sessionId) => {
@@ -232,12 +248,14 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     }
 
     this.broadcast("explosion", { holderId });
-    
+
     // Make next round faster
     const oldTimer = this.state.maxTimer;
     this.state.maxTimer = Math.max(5, this.state.maxTimer - 3);
     if (this.state.maxTimer < oldTimer) {
-      this.comms.addEvent(`Timer speeds up! Now only ${this.state.maxTimer.toFixed(0)}s`);
+      this.comms.addEvent(
+        `Timer speeds up! Now only ${this.state.maxTimer.toFixed(0)}s`,
+      );
     }
   }
 
@@ -245,15 +263,15 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     // AI Game-Master tick
     if (this.state.matchStarted && !this.state.matchEnded) {
       this.comms.tick(deltaTime);
-      
+
       // Apply AI arena events dynamically
       const aiOutput = this.comms.getLatestOutput();
       if (aiOutput?.arenaEvent) {
         const event = aiOutput.arenaEvent;
-        if (event.type === 'slow_mo' && !this.dynamitePaused) {
+        if (event.type === "slow_mo" && !this.dynamitePaused) {
           this.dynamitePaused = true;
           this.dynamitePauseTimer = 5; // Pause for 5 seconds
-          this.comms.addEvent('⏸️ DYNAMITE PAUSED! 5 second breather!');
+          this.comms.addEvent("⏸️ DYNAMITE PAUSED! 5 second breather!");
         }
       }
     }
@@ -261,7 +279,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     if (!this.state.matchStarted || this.state.matchEnded) return;
 
     const dt = deltaTime / 1000;
-    
+
     // Decrement match timer
     this.state.matchTimer -= dt;
     if (this.state.matchTimer <= 0) {
@@ -269,13 +287,13 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       this.endMatch();
       return;
     }
-    
+
     // Handle dynamite pause timer
     if (this.dynamitePaused) {
       this.dynamitePauseTimer -= dt;
       if (this.dynamitePauseTimer <= 0) {
         this.dynamitePaused = false;
-        this.comms.addEvent('▶️ DYNAMITE ACTIVE AGAIN!');
+        this.comms.addEvent("▶️ DYNAMITE ACTIVE AGAIN!");
       }
     }
 
@@ -284,14 +302,14 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       if (!this.dynamitePaused) {
         this.state.currentDynamiteTimer -= dt;
       }
-      
+
       if (this.state.currentDynamiteTimer <= 0) {
         this.triggerExplosion();
       }
 
       // Update players
       const playersArray = Array.from(this.state.players.entries());
-      
+
       playersArray.forEach(([id, player]) => {
         if (!player.isAlive) return;
 
@@ -300,12 +318,15 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
         }
 
         const baseSpeed = 230;
-        const currentSpeed = baseSpeed * (player.hasDynamite ? 1.20 : 1.0);
+        const currentSpeed = baseSpeed * (player.hasDynamite ? 1.2 : 1.0);
 
-        let mag = Math.sqrt(player.velocityX * player.velocityX + player.velocityY * player.velocityY);
+        let mag = Math.sqrt(
+          player.velocityX * player.velocityX +
+            player.velocityY * player.velocityY,
+        );
         let vx = 0;
         let vy = 0;
-        
+
         if (mag > 0) {
           vx = (player.velocityX / mag) * currentSpeed;
           vy = (player.velocityY / mag) * currentSpeed;
@@ -328,7 +349,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
         for (let j = i + 1; j < playersArray.length; j++) {
           const [id1, p1] = playersArray[i];
           const [id2, p2] = playersArray[j];
-          
+
           if (!p1.isAlive || !p2.isAlive) continue;
 
           let dx = p1.x - p2.x;
@@ -338,29 +359,49 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
 
           if (dist < minDist) {
             // Pass dynamite
-            if (p1.hasDynamite && !p2.hasDynamite && p1.passCooldown <= 0 && p2.passCooldown <= 0) {
+            if (
+              p1.hasDynamite &&
+              !p2.hasDynamite &&
+              p1.passCooldown <= 0 &&
+              p2.passCooldown <= 0
+            ) {
               p1.hasDynamite = false;
               p2.hasDynamite = true;
               p1.passCooldown = 0.5;
               p2.passCooldown = 0.5;
-              this.comms.addEvent(`${p1.displayName} passed dynamite to ${p2.displayName}`);
+              this.comms.addEvent(
+                `${p1.displayName} passed dynamite to ${p2.displayName}`,
+              );
               this.broadcast("dynamite_passed", { from: id1, to: id2 });
-            } else if (p2.hasDynamite && !p1.hasDynamite && p1.passCooldown <= 0 && p2.passCooldown <= 0) {
+            } else if (
+              p2.hasDynamite &&
+              !p1.hasDynamite &&
+              p1.passCooldown <= 0 &&
+              p2.passCooldown <= 0
+            ) {
               p2.hasDynamite = false;
               p1.hasDynamite = true;
               p1.passCooldown = 0.5;
               p2.passCooldown = 0.5;
-              this.comms.addEvent(`${p2.displayName} passed dynamite to ${p1.displayName}`);
+              this.comms.addEvent(
+                `${p2.displayName} passed dynamite to ${p1.displayName}`,
+              );
               this.broadcast("dynamite_passed", { from: id2, to: id1 });
             }
 
             // Soft push apart
-            if (dist === 0) { dx = 1; dy = 0; dist = 1; }
+            if (dist === 0) {
+              dx = 1;
+              dy = 0;
+              dist = 1;
+            }
             const push = (minDist - dist) * 0.5;
             const px = (dx / dist) * push;
             const py = (dy / dist) * push;
-            p1.x += px; p1.y += py;
-            p2.x -= px; p2.y -= py;
+            p1.x += px;
+            p1.y += py;
+            p2.x -= px;
+            p2.y -= py;
           }
         }
       }
@@ -384,8 +425,10 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     let maxScore = -1;
     let isDraw = false;
 
-    const alivePlayers = Array.from(this.state.players.entries()).filter(([id, p]) => p.isAlive);
-    
+    const alivePlayers = Array.from(this.state.players.entries()).filter(
+      ([id, p]) => p.isAlive,
+    );
+
     if (alivePlayers.length === 1) {
       winnerId = alivePlayers[0][0];
       winnerName = alivePlayers[0][1].displayName;
@@ -404,9 +447,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
     this.state.winnerId = winnerId;
 
     console.log(
-      isDraw
-        ? `🧨 Draw — everyone blew up!`
-        : `🧨 ${winnerName} wins!`
+      isDraw ? `🧨 Draw — everyone blew up!` : `🧨 ${winnerName} wins!`,
     );
 
     this.broadcast("match_end", {
@@ -416,17 +457,24 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       isDraw,
     });
 
-    const playerStatsToSave: { id: string, displayName: string, isWinner: boolean, score: number }[] = [];
+    const playerStatsToSave: {
+      id: string;
+      displayName: string;
+      isWinner: boolean;
+      score: number;
+    }[] = [];
     this.state.players.forEach((player: PlayerState, sessionId: string) => {
       playerStatsToSave.push({
         id: player.playerId || sessionId,
         displayName: player.displayName,
         isWinner: !isDraw && sessionId === winnerId,
-        score: player.score
+        score: player.score,
       });
     });
 
-    savePlayerStats(playerStatsToSave).catch((err) => console.warn(`⚠️  Failed to save player stats: ${err.message}`));
+    savePlayerStats(playerStatsToSave).catch((err) =>
+      console.warn(`⚠️  Failed to save player stats: ${err.message}`),
+    );
 
     saveMatchResult({
       roomId: this.roomId,
@@ -443,8 +491,14 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
         // Chain to Turf Soccer as the third (final) game
         const nextRoomId = this.roomId + "_ts";
         const { matchMaker } = await import("colyseus");
-        await matchMaker.createRoom("turf_soccer_room", { customRoomId: nextRoomId, isTransitionRoom: true });
-        this.broadcast("next_game", { roomId: nextRoomId, roomName: "turf_soccer_room" });
+        await matchMaker.createRoom("turf_soccer_room", {
+          customRoomId: nextRoomId,
+          isTransitionRoom: true,
+        });
+        this.broadcast("next_game", {
+          roomId: nextRoomId,
+          roomName: "turf_soccer_room",
+        });
       } catch (e) {
         console.error("Failed to create next room", e);
         this.resetMatch();
@@ -465,7 +519,7 @@ export class RedDynamiteRoom extends Room<RedDynamiteState> {
       player.hasDynamite = false;
       player.velocityX = 0;
       player.velocityY = 0;
-      
+
       const angle = Math.random() * Math.PI * 2;
       const spawnRadius = ISLAND_RADIUS * 0.7;
       player.x = CX + Math.cos(angle) * spawnRadius;

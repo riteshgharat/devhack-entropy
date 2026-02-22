@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 
 /* Color palette — matches the splash screen stickmen */
 const STICKMAN_COLORS = [
-  { name: 'Red', hex: '#ef4444' },
-  { name: 'Blue', hex: '#3b82f6' },
-  { name: 'Green', hex: '#22c55e' },
-  { name: 'Yellow', hex: '#eab308' },
-  { name: 'Purple', hex: '#a855f7' },
-  { name: 'Orange', hex: '#f97316' },
-  { name: 'Pink', hex: '#ec4899' },
-  { name: 'Cyan', hex: '#06b6d4' },
+  { name: "Red", hex: "#ef4444" },
+  { name: "Blue", hex: "#3b82f6" },
+  { name: "Green", hex: "#22c55e" },
+  { name: "Yellow", hex: "#eab308" },
+  { name: "Purple", hex: "#a855f7" },
+  { name: "Orange", hex: "#f97316" },
+  { name: "Pink", hex: "#ec4899" },
+  { name: "Cyan", hex: "#06b6d4" },
 ];
 
 interface PixelCharacterProps {
@@ -20,173 +20,307 @@ interface PixelCharacterProps {
 
 /* ── Same PixelStickman as splash screen ── */
 interface StickmanProps {
-    color: string;
-    eyeColor?: string;
-    scale?: number;
-    weapon?: 'sword' | 'shield' | 'none';
-    crown?: boolean;
+  color: string;
+  eyeColor?: string;
+  scale?: number;
+  weapon?: "sword" | "shield" | "none";
+  crown?: boolean;
 }
 
 const PixelStickman: React.FC<StickmanProps> = ({
-    color,
-    eyeColor = '#fff',
-    scale = 1,
-    weapon = 'none',
-    crown = false,
+  color,
+  eyeColor = "#fff",
+  scale = 1,
+  weapon = "none",
+  crown = false,
 }) => {
-    const s = (v: number) => `${v * scale}px`;
-    return (
-        <div className="relative" style={{ width: s(56), height: s(90), imageRendering: 'pixelated' }}>
-            {/* Crown for leader */}
-            {crown && (
-                <div className="absolute left-1/2 -translate-x-1/2" style={{ top: s(-10), zIndex: 20 }}>
-                    <div style={{
-                        width: s(24), height: s(10),
-                        background: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)',
-                        border: `${s(2)} solid #92400e`,
-                        clipPath: 'polygon(0% 100%, 0% 30%, 25% 0%, 50% 40%, 75% 0%, 100% 30%, 100% 100%)',
-                    }} />
-                </div>
-            )}
-
-            {/* Head */}
-            <div className="absolute left-1/2 -translate-x-1/2" style={{
-                top: 0, width: s(22), height: s(22),
-                backgroundColor: color,
-                border: `${s(3)} solid #111`,
-                boxShadow: `inset ${s(-3)} ${s(-3)} 0 0 rgba(0,0,0,0.25), inset ${s(2)} ${s(2)} 0 0 rgba(255,255,255,0.15)`,
-            }}>
-                {/* Eyes */}
-                <div className="absolute" style={{
-                    top: s(6), left: s(3), width: s(4), height: s(4),
-                    backgroundColor: eyeColor,
-                    boxShadow: `${s(7)} 0 0 0 ${eyeColor}`,
-                }} />
-                {/* Mouth grin */}
-                <div className="absolute" style={{
-                    bottom: s(3), left: s(4), width: s(14), height: s(2),
-                    backgroundColor: '#111',
-                    boxShadow: `${s(-4)} 0 0 0 #111, ${s(4)} 0 0 0 #111`,
-                }} />
-            </div>
-
-            {/* Neck */}
-            <div className="absolute left-1/2 -translate-x-1/2" style={{
-                top: s(22), width: s(8), height: s(4), backgroundColor: color,
-            }} />
-
-            {/* Body */}
-            <div className="absolute left-1/2 -translate-x-1/2" style={{
-                top: s(26), width: s(16), height: s(26),
-                backgroundColor: color,
-                border: `${s(3)} solid #111`,
-                boxShadow: `inset ${s(-3)} ${s(-3)} 0 0 rgba(0,0,0,0.25), inset ${s(2)} ${s(2)} 0 0 rgba(255,255,255,0.1)`,
-            }}>
-                {/* Belt */}
-                <div style={{
-                    position: 'absolute', bottom: 0, left: 0, right: 0,
-                    height: s(5), backgroundColor: 'rgba(0,0,0,0.4)',
-                }} />
-                {/* Belt buckle */}
-                <div style={{
-                    position: 'absolute', bottom: s(1), left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: s(4), height: s(4), backgroundColor: '#fbbf24',
-                    border: `${s(1)} solid #92400e`,
-                }} />
-            </div>
-
-            {/* Left Arm */}
-            <div className="absolute" style={{
-                top: s(26), left: s(-2), width: s(9), height: s(20),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
-                transformOrigin: 'top center',
-            }} />
-
-            {/* Right Arm */}
-            <div className="absolute" style={{
-                top: s(26), right: s(-2), width: s(9), height: s(20),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
-            }} />
-
-            {/* Weapon - Sword */}
-            {weapon === 'sword' && (
-                <div className="absolute" style={{ top: s(18), right: s(-14), width: s(8), height: s(40), zIndex: 20 }}>
-                    {/* Blade */}
-                    <div style={{
-                        position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
-                        width: s(4), height: s(28),
-                        background: 'linear-gradient(180deg, #e2e8f0 0%, #94a3b8 50%, #64748b 100%)',
-                        border: `${s(1)} solid #334155`,
-                        clipPath: 'polygon(20% 0, 80% 0, 100% 100%, 0 100%)',
-                    }} />
-                    {/* Guard */}
-                    <div style={{
-                        position: 'absolute', top: s(26), left: 0,
-                        width: s(8), height: s(4),
-                        backgroundColor: '#d97706',
-                        border: `${s(1)} solid #92400e`,
-                    }} />
-                    {/* Handle */}
-                    <div style={{
-                        position: 'absolute', top: s(30), left: '50%', transform: 'translateX(-50%)',
-                        width: s(3), height: s(10),
-                        backgroundColor: '#92400e',
-                        border: `${s(1)} solid #451a03`,
-                    }} />
-                </div>
-            )}
-
-            {/* Weapon - Shield */}
-            {weapon === 'shield' && (
-                <div className="absolute" style={{ top: s(22), left: s(-20), width: s(18), height: s(22), zIndex: 20 }}>
-                    <div style={{
-                        width: '100%', height: '100%',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                        border: `${s(3)} solid #1e3a8a`,
-                        clipPath: 'polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                        <div style={{ width: s(6), height: s(6), backgroundColor: '#fbbf24', border: `${s(1)} solid #92400e` }} />
-                    </div>
-                </div>
-            )}
-
-            {/* Left Leg */}
-            <div className="absolute" style={{
-                top: s(52), left: s(11), width: s(11), height: s(26),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                filter: 'brightness(0.8)',
-            }} />
-
-            {/* Right Leg */}
-            <div className="absolute" style={{
-                top: s(52), right: s(11), width: s(11), height: s(26),
-                backgroundColor: color,
-                border: `${s(2)} solid #111`,
-                filter: 'brightness(0.8)',
-            }} />
-
-            {/* Boots */}
-            <div className="absolute" style={{
-                top: s(76), left: s(7), width: s(16), height: s(9),
-                backgroundColor: '#1c1917',
-                border: `${s(2)} solid #000`,
-                boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
-            }} />
-            <div className="absolute" style={{
-                top: s(76), right: s(7), width: s(16), height: s(9),
-                backgroundColor: '#1c1917',
-                border: `${s(2)} solid #000`,
-                boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
-            }} />
+  const s = (v: number) => `${v * scale}px`;
+  return (
+    <div
+      className="relative"
+      style={{ width: s(56), height: s(90), imageRendering: "pixelated" }}
+    >
+      {/* Crown for leader */}
+      {crown && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2"
+          style={{ top: s(-10), zIndex: 20 }}
+        >
+          <div
+            style={{
+              width: s(24),
+              height: s(10),
+              background: "linear-gradient(180deg, #fbbf24 0%, #d97706 100%)",
+              border: `${s(2)} solid #92400e`,
+              clipPath:
+                "polygon(0% 100%, 0% 30%, 25% 0%, 50% 40%, 75% 0%, 100% 30%, 100% 100%)",
+            }}
+          />
         </div>
-    );
+      )}
+
+      {/* Head */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          top: 0,
+          width: s(22),
+          height: s(22),
+          backgroundColor: color,
+          border: `${s(3)} solid #111`,
+          boxShadow: `inset ${s(-3)} ${s(-3)} 0 0 rgba(0,0,0,0.25), inset ${s(2)} ${s(2)} 0 0 rgba(255,255,255,0.15)`,
+        }}
+      >
+        {/* Eyes */}
+        <div
+          className="absolute"
+          style={{
+            top: s(6),
+            left: s(3),
+            width: s(4),
+            height: s(4),
+            backgroundColor: eyeColor,
+            boxShadow: `${s(7)} 0 0 0 ${eyeColor}`,
+          }}
+        />
+        {/* Mouth grin */}
+        <div
+          className="absolute"
+          style={{
+            bottom: s(3),
+            left: s(4),
+            width: s(14),
+            height: s(2),
+            backgroundColor: "#111",
+            boxShadow: `${s(-4)} 0 0 0 #111, ${s(4)} 0 0 0 #111`,
+          }}
+        />
+      </div>
+
+      {/* Neck */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          top: s(22),
+          width: s(8),
+          height: s(4),
+          backgroundColor: color,
+        }}
+      />
+
+      {/* Body */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2"
+        style={{
+          top: s(26),
+          width: s(16),
+          height: s(26),
+          backgroundColor: color,
+          border: `${s(3)} solid #111`,
+          boxShadow: `inset ${s(-3)} ${s(-3)} 0 0 rgba(0,0,0,0.25), inset ${s(2)} ${s(2)} 0 0 rgba(255,255,255,0.1)`,
+        }}
+      >
+        {/* Belt */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: s(5),
+            backgroundColor: "rgba(0,0,0,0.4)",
+          }}
+        />
+        {/* Belt buckle */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: s(1),
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: s(4),
+            height: s(4),
+            backgroundColor: "#fbbf24",
+            border: `${s(1)} solid #92400e`,
+          }}
+        />
+      </div>
+
+      {/* Left Arm */}
+      <div
+        className="absolute"
+        style={{
+          top: s(26),
+          left: s(-2),
+          width: s(9),
+          height: s(20),
+          backgroundColor: color,
+          border: `${s(2)} solid #111`,
+          boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
+          transformOrigin: "top center",
+        }}
+      />
+
+      {/* Right Arm */}
+      <div
+        className="absolute"
+        style={{
+          top: s(26),
+          right: s(-2),
+          width: s(9),
+          height: s(20),
+          backgroundColor: color,
+          border: `${s(2)} solid #111`,
+          boxShadow: `inset ${s(-2)} ${s(-2)} 0 0 rgba(0,0,0,0.2)`,
+        }}
+      />
+
+      {/* Weapon - Sword */}
+      {weapon === "sword" && (
+        <div
+          className="absolute"
+          style={{
+            top: s(18),
+            right: s(-14),
+            width: s(8),
+            height: s(40),
+            zIndex: 20,
+          }}
+        >
+          {/* Blade */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: s(4),
+              height: s(28),
+              background:
+                "linear-gradient(180deg, #e2e8f0 0%, #94a3b8 50%, #64748b 100%)",
+              border: `${s(1)} solid #334155`,
+              clipPath: "polygon(20% 0, 80% 0, 100% 100%, 0 100%)",
+            }}
+          />
+          {/* Guard */}
+          <div
+            style={{
+              position: "absolute",
+              top: s(26),
+              left: 0,
+              width: s(8),
+              height: s(4),
+              backgroundColor: "#d97706",
+              border: `${s(1)} solid #92400e`,
+            }}
+          />
+          {/* Handle */}
+          <div
+            style={{
+              position: "absolute",
+              top: s(30),
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: s(3),
+              height: s(10),
+              backgroundColor: "#92400e",
+              border: `${s(1)} solid #451a03`,
+            }}
+          />
+        </div>
+      )}
+
+      {/* Weapon - Shield */}
+      {weapon === "shield" && (
+        <div
+          className="absolute"
+          style={{
+            top: s(22),
+            left: s(-20),
+            width: s(18),
+            height: s(22),
+            zIndex: 20,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+              border: `${s(3)} solid #1e3a8a`,
+              clipPath: "polygon(0 0, 100% 0, 100% 65%, 50% 100%, 0 65%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                width: s(6),
+                height: s(6),
+                backgroundColor: "#fbbf24",
+                border: `${s(1)} solid #92400e`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Left Leg */}
+      <div
+        className="absolute"
+        style={{
+          top: s(52),
+          left: s(11),
+          width: s(11),
+          height: s(26),
+          backgroundColor: color,
+          border: `${s(2)} solid #111`,
+          filter: "brightness(0.8)",
+        }}
+      />
+
+      {/* Right Leg */}
+      <div
+        className="absolute"
+        style={{
+          top: s(52),
+          right: s(11),
+          width: s(11),
+          height: s(26),
+          backgroundColor: color,
+          border: `${s(2)} solid #111`,
+          filter: "brightness(0.8)",
+        }}
+      />
+
+      {/* Boots */}
+      <div
+        className="absolute"
+        style={{
+          top: s(76),
+          left: s(7),
+          width: s(16),
+          height: s(9),
+          backgroundColor: "#1c1917",
+          border: `${s(2)} solid #000`,
+          boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
+        }}
+      />
+      <div
+        className="absolute"
+        style={{
+          top: s(76),
+          right: s(7),
+          width: s(16),
+          height: s(9),
+          backgroundColor: "#1c1917",
+          border: `${s(2)} solid #000`,
+          boxShadow: `inset ${s(2)} 0 0 0 rgba(255,255,255,0.1)`,
+        }}
+      />
+    </div>
+  );
 };
 
 export const PixelCharacter: React.FC<PixelCharacterProps> = ({
@@ -198,7 +332,7 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
 
   const currentColor = externalColor || STICKMAN_COLORS[colorIndex].hex;
   const currentName =
-    STICKMAN_COLORS.find((c) => c.hex === currentColor)?.name || 'Custom';
+    STICKMAN_COLORS.find((c) => c.hex === currentColor)?.name || "Custom";
 
   const cycleColor = () => {
     const nextIndex = (colorIndex + 1) % STICKMAN_COLORS.length;
@@ -224,7 +358,7 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
           transition={{
             duration: 2,
             repeat: Infinity,
-            ease: 'easeInOut',
+            ease: "easeInOut",
           }}
         >
           <PixelStickman color={currentColor} scale={2.8} />
@@ -234,11 +368,11 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
         <motion.div
           className="absolute -bottom-4 left-1/2 -translate-x-1/2 rounded-full"
           style={{
-            width: '110px',
-            height: '18px',
+            width: "110px",
+            height: "18px",
             backgroundColor: currentColor,
             opacity: 0.3,
-            filter: 'blur(10px)',
+            filter: "blur(10px)",
           }}
           animate={{ opacity: [0.2, 0.5, 0.2], scale: [0.9, 1.1, 0.9] }}
           transition={{ duration: 2, repeat: Infinity }}
@@ -257,19 +391,25 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
       >
         <motion.div
           className="bg-white border-3 p-2.5 px-3 relative"
-          style={{ borderColor: currentColor, borderWidth: '3px' }}
+          style={{ borderColor: currentColor, borderWidth: "3px" }}
           animate={{ y: [0, -3, 0] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
           <p className="font-display text-[9px] text-black whitespace-nowrap">
             🎨 TAP TO
           </p>
-          <p className="font-display text-[9px] whitespace-nowrap" style={{ color: currentColor }}>
+          <p
+            className="font-display text-[9px] whitespace-nowrap"
+            style={{ color: currentColor }}
+          >
             RECOLOR!
           </p>
           <div
             className="absolute bottom-0 left-3 w-3 h-3 bg-white -translate-x-1/2 translate-y-1/2 rotate-45"
-            style={{ borderRight: `3px solid ${currentColor}`, borderBottom: `3px solid ${currentColor}` }}
+            style={{
+              borderRight: `3px solid ${currentColor}`,
+              borderBottom: `3px solid ${currentColor}`,
+            }}
           />
         </motion.div>
       </motion.div>
@@ -284,8 +424,9 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
             className="absolute -bottom-10 left-1/2 -translate-x-1/2 px-4 py-1 border-2 border-black z-20"
             style={{ backgroundColor: currentColor }}
           >
-            <p className="font-display text-[10px] text-white whitespace-nowrap"
-              style={{ textShadow: '1px 1px 0 #000' }}
+            <p
+              className="font-display text-[10px] text-white whitespace-nowrap"
+              style={{ textShadow: "1px 1px 0 #000" }}
             >
               {currentName.toUpperCase()}
             </p>
@@ -300,11 +441,11 @@ export const PixelCharacter: React.FC<PixelCharacterProps> = ({
             key={c.hex}
             className="border border-black/40 cursor-pointer"
             style={{
-              width: '10px',
-              height: '10px',
+              width: "10px",
+              height: "10px",
               backgroundColor: c.hex,
               opacity: c.hex === currentColor ? 1 : 0.4,
-              boxShadow: c.hex === currentColor ? `0 0 6px ${c.hex}` : 'none',
+              boxShadow: c.hex === currentColor ? `0 0 6px ${c.hex}` : "none",
             }}
             whileHover={{ scale: 1.5 }}
             onClick={(e) => {

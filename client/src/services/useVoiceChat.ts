@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Room } from 'colyseus.js';
-import { VoiceChat, VoicePeer } from './voiceChat';
+import { useEffect, useRef, useState, useCallback } from "react";
+import { Room } from "colyseus.js";
+import { VoiceChat, VoicePeer } from "./voiceChat";
 
 export interface UseVoiceChatResult {
   /** List of all voice participants (remote peers only) */
@@ -21,7 +21,10 @@ export interface UseVoiceChatResult {
   toggleMute: () => void;
 }
 
-export function useVoiceChat(room: Room | null, mySessionId?: string): UseVoiceChatResult {
+export function useVoiceChat(
+  room: Room | null,
+  mySessionId?: string,
+): UseVoiceChatResult {
   const chatRef = useRef<VoiceChat | null>(null);
   const [peers, setPeers] = useState<VoicePeer[]>([]);
   const [isJoined, setIsJoined] = useState(false);
@@ -35,12 +38,12 @@ export function useVoiceChat(room: Room | null, mySessionId?: string): UseVoiceC
     const vc = new VoiceChat(room, mySessionId);
     chatRef.current = vc;
 
-    const offPeers = vc.on('peersChanged', (list) => {
+    const offPeers = vc.on("peersChanged", (list) => {
       setPeers(list);
     });
 
-    const offSpeaking = vc.on('speakingChanged', ({ sessionId, speaking }) => {
-      setSpeakingMap(prev => ({ ...prev, [sessionId]: speaking }));
+    const offSpeaking = vc.on("speakingChanged", ({ sessionId, speaking }) => {
+      setSpeakingMap((prev) => ({ ...prev, [sessionId]: speaking }));
     });
 
     return () => {
@@ -81,7 +84,16 @@ export function useVoiceChat(room: Room | null, mySessionId?: string): UseVoiceC
     }
   }, []);
 
-  const isSpeaking = speakingMap[mySessionId ?? ''] ?? false;
+  const isSpeaking = speakingMap[mySessionId ?? ""] ?? false;
 
-  return { peers, isJoined, isMuted, isSpeaking, speakingMap, join, leave, toggleMute };
+  return {
+    peers,
+    isJoined,
+    isMuted,
+    isSpeaking,
+    speakingMap,
+    join,
+    leave,
+    toggleMute,
+  };
 }

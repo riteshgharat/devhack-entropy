@@ -1,5 +1,5 @@
 import { Room, Client, matchMaker } from "colyseus";
-import { RoomComms } from '../../../ai/roomComms';
+import { RoomComms } from "../../../ai/roomComms";
 import { GameState } from "../schemas/GameState";
 import { PlayerState } from "../schemas/PlayerState";
 import { ItemState } from "../schemas/GrassState";
@@ -20,7 +20,11 @@ import {
   ROWS,
   PLAYER_RADIUS,
 } from "../utils/constants";
-import { saveMatchResult, savePlayerStats, updatePlayerName } from "../../../db/matchHistory";
+import {
+  saveMatchResult,
+  savePlayerStats,
+  updatePlayerName,
+} from "../../../db/matchHistory";
 
 // ─── Message types from the client ───────────────────────
 interface MoveInput {
@@ -81,7 +85,7 @@ export class GameRoom extends Room<GameState> {
       if (player && name && name.length <= 15) {
         player.displayName = name;
         console.log(`👤 Name update: ${name} (${client.sessionId})`);
-        
+
         if (player.playerId) {
           await updatePlayerName(player.playerId, name);
         }
@@ -94,7 +98,7 @@ export class GameRoom extends Room<GameState> {
     }, 1000 / TICK_RATE);
 
     // AI Game-Master & communication hub
-    this.comms = new RoomComms(this, 'grass');
+    this.comms = new RoomComms(this, "grass");
 
     console.log(`🏟️  GameRoom created | Room ID: ${this.roomId}`);
   }
@@ -118,15 +122,25 @@ export class GameRoom extends Room<GameState> {
       options?.displayName || `Player_${client.sessionId.slice(0, 4)}`;
     player.playerId = options?.playerId || client.sessionId;
 
-    const colors = ["#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
-    player.color = options?.color || colors[this.state.players.size % colors.length];
+    const colors = [
+      "#ef4444",
+      "#3b82f6",
+      "#22c55e",
+      "#eab308",
+      "#a855f7",
+      "#ec4899",
+      "#14b8a6",
+      "#f97316",
+    ];
+    player.color =
+      options?.color || colors[this.state.players.size % colors.length];
 
     this.state.players.set(client.sessionId, player);
 
     console.log(
       `✅ ${player.displayName} joined | ` +
         `Session: ${client.sessionId} | ` +
-        `Players: ${this.state.players.size}/${MAX_PLAYERS}`
+        `Players: ${this.state.players.size}/${MAX_PLAYERS}`,
     );
 
     // Start countdown if we have enough players
@@ -138,9 +152,7 @@ export class GameRoom extends Room<GameState> {
     if (!player) return;
 
     this.comms.onClientLeave(client.sessionId);
-    console.log(
-      `❌ ${player.displayName} left | Session: ${client.sessionId}`
-    );
+    console.log(`❌ ${player.displayName} left | Session: ${client.sessionId}`);
 
     this.state.players.delete(client.sessionId);
 
@@ -227,7 +239,7 @@ export class GameRoom extends Room<GameState> {
         // Clamp velocity magnitude
         const speed = Math.sqrt(
           player.velocityX * player.velocityX +
-            player.velocityY * player.velocityY
+            player.velocityY * player.velocityY,
         );
         if (speed > MAX_VELOCITY * player.speedMultiplier) {
           const scale = (MAX_VELOCITY * player.speedMultiplier) / speed;
@@ -257,15 +269,18 @@ export class GameRoom extends Room<GameState> {
           const playerTimers = this.playerCutTimers.get(sessionId);
           const lastCut = playerTimers?.get(key) || 0;
           const now = Date.now();
-          if (now - lastCut > 500) { // 500ms cooldown per tile per entity
+          if (now - lastCut > 500) {
+            // 500ms cooldown per tile per entity
             this.state.grid[idx]--;
             playerTimers?.set(key, now);
             if (this.state.grid[idx] === 0) {
               player.score += 10;
-              
+
               // Track score milestones for AI commentary
               if (player.score % 50 === 0 && player.score > 0) {
-                this.comms.addEvent(`${player.displayName} hits ${player.score} points!`);
+                this.comms.addEvent(
+                  `${player.displayName} hits ${player.score} points!`,
+                );
               }
             }
           }
@@ -286,7 +301,7 @@ export class GameRoom extends Room<GameState> {
         }
 
         if (item.revealed) {
-          if (item.type === 'mine') {
+          if (item.type === "mine") {
             item.timer -= dt;
             if (item.timer <= 0) {
               item.active = false;
@@ -299,20 +314,26 @@ export class GameRoom extends Room<GameState> {
                   p.stunTimer = 2;
                   p.score = Math.max(0, p.score - 5);
                   stunCount++;
-                  this.comms.addEvent(`${p.displayName} hit by mine (-5 pts, stunned)`);
+                  this.comms.addEvent(
+                    `${p.displayName} hit by mine (-5 pts, stunned)`,
+                  );
                 }
               });
               if (stunCount > 1) {
-                this.comms.addEvent(`MINE EXPLOSION! ${stunCount} players stunned`);
+                this.comms.addEvent(
+                  `MINE EXPLOSION! ${stunCount} players stunned`,
+                );
               }
             }
-          } else if (item.type === 'booster') {
+          } else if (item.type === "booster") {
             const dx = player.x - item.x;
             const dy = player.y - item.y;
             if (Math.sqrt(dx * dx + dy * dy) < PLAYER_RADIUS + TILE_SIZE / 2) {
               item.active = false;
               player.speedMultiplier = 1.5;
-              this.comms.addEvent(`${player.displayName} grabbed speed booster!`);
+              this.comms.addEvent(
+                `${player.displayName} grabbed speed booster!`,
+              );
               setTimeout(() => {
                 if (this.state.players.has(sessionId)) {
                   this.state.players.get(sessionId)!.speedMultiplier = 1;
@@ -386,7 +407,7 @@ export class GameRoom extends Room<GameState> {
           item.id = `item_${r}_${c}`;
           item.x = c * TILE_SIZE + TILE_SIZE / 2;
           item.y = r * TILE_SIZE + TILE_SIZE / 2;
-          item.type = Math.random() > 0.3 ? 'mine' : 'booster';
+          item.type = Math.random() > 0.3 ? "mine" : "booster";
           item.revealed = false;
           item.active = true;
           item.timer = 2 + Math.random() * 3;
@@ -403,12 +424,16 @@ export class GameRoom extends Room<GameState> {
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
-      player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+      player.x =
+        SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
+      player.y =
+        SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
       this.playerCutTimers.set(sessionId, new Map());
     });
 
-    console.log(`��� Match started! ${this.state.players.size} players in the arena.`);
+    console.log(
+      `��� Match started! ${this.state.players.size} players in the arena.`,
+    );
     this.broadcast("match_start", { playerCount: this.state.players.size });
   }
 
@@ -444,7 +469,7 @@ export class GameRoom extends Room<GameState> {
     console.log(
       isDraw
         ? `��� Draw — multiple players tied with ${maxScore} grass!`
-        : `��� ${winnerName} wins with ${maxScore} grass!`
+        : `��� ${winnerName} wins with ${maxScore} grass!`,
     );
 
     this.broadcast("match_end", {
@@ -454,17 +479,24 @@ export class GameRoom extends Room<GameState> {
       isDraw,
     });
 
-    const playerStatsToSave: { id: string, displayName: string, isWinner: boolean, score: number }[] = [];
+    const playerStatsToSave: {
+      id: string;
+      displayName: string;
+      isWinner: boolean;
+      score: number;
+    }[] = [];
     this.state.players.forEach((player: PlayerState, sessionId: string) => {
       playerStatsToSave.push({
         id: player.playerId || sessionId,
         displayName: player.displayName,
         isWinner: !isDraw && sessionId === winnerId,
-        score: player.score
+        score: player.score,
       });
     });
 
-    savePlayerStats(playerStatsToSave).catch((err) => console.warn(`⚠️  Failed to save player stats: ${err.message}`));
+    savePlayerStats(playerStatsToSave).catch((err) =>
+      console.warn(`⚠️  Failed to save player stats: ${err.message}`),
+    );
 
     // Persist match result to database (async, non-blocking)
     saveMatchResult({
@@ -480,8 +512,14 @@ export class GameRoom extends Room<GameState> {
     this.resetTimeout = setTimeout(async () => {
       try {
         const nextRoomId = this.roomId + "_rd";
-        await matchMaker.createRoom("red_dynamite_room", { customRoomId: nextRoomId, isTransitionRoom: true });
-        this.broadcast("next_game", { roomId: nextRoomId, roomName: "red_dynamite_room" });
+        await matchMaker.createRoom("red_dynamite_room", {
+          customRoomId: nextRoomId,
+          isTransitionRoom: true,
+        });
+        this.broadcast("next_game", {
+          roomId: nextRoomId,
+          roomName: "red_dynamite_room",
+        });
       } catch (e) {
         console.error("Failed to create next room", e);
         this.resetMatch();
@@ -508,8 +546,10 @@ export class GameRoom extends Room<GameState> {
       player.stunTimer = 0;
       player.velocityX = 0;
       player.velocityY = 0;
-      player.x = SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
-      player.y = SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
+      player.x =
+        SPAWN_MARGIN + Math.random() * (ARENA_WIDTH - 2 * SPAWN_MARGIN);
+      player.y =
+        SPAWN_MARGIN + Math.random() * (ARENA_HEIGHT - 2 * SPAWN_MARGIN);
     });
 
     console.log(`��� Room reset. ${this.state.players.size} players ready.`);

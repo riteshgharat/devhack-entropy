@@ -1,6 +1,7 @@
 # Chaos Arena – Frontend Execution Phases
 
 Tech Stack:
+
 - React.js
 - TypeScript
 - KAPLAY (Kaboom.js)
@@ -18,6 +19,7 @@ Frontend is predictive and visual.
 # PHASE 1: Core Setup & Networking Foundation
 
 ## Objective
+
 Establish working multiplayer rendering with WebSocket connectivity and basic scene setup.
 
 ---
@@ -105,6 +107,7 @@ Basic multiplayer visual sync.
 # PHASE 2: Game Engine Rendering & Sync Logic
 
 ## Objective
+
 Implement prediction, interpolation, elimination visuals, and HUD.
 
 ---
@@ -118,10 +121,12 @@ games/arena-brawl/input.ts
 Support:
 
 Desktop:
+
 - WASD / Arrow Keys
 - Space (jump)
 
 Mobile:
+
 - Virtual joystick
 - Tap-to-jump
 
@@ -161,9 +166,11 @@ core/reconciliation.ts
 When authoritative state arrives:
 
 If large mismatch:
+
 - Snap position
 
 If small mismatch:
+
 - Lerp smoothly
 
 Never allow long-term drift.
@@ -219,6 +226,7 @@ Clean game UI visible on mobile & desktop.
 # PHASE 3: AI Visual Integration & Chaos Systems
 
 ## Objective
+
 Visually reflect AI decisions and create dramatic chaos effects.
 
 ---
@@ -228,9 +236,9 @@ Visually reflect AI decisions and create dramatic chaos effects.
 Frontend listens for server event:
 
 {
-  type: "spawn_trap",
-  x: number,
-  y: number
+type: "spawn_trap",
+x: number,
+y: number
 }
 
 Trigger:
@@ -260,7 +268,7 @@ ui/CommentaryOverlay.tsx
 When server sends:
 
 {
-  commentary: string
+commentary: string
 }
 
 Render:
@@ -323,6 +331,7 @@ Dramatic match end.
 # PHASE 4: Deployment & Production Hardening
 
 ## Objective
+
 Ensure frontend is stable, optimized, and demo-ready.
 
 ---
@@ -362,6 +371,7 @@ Optimization Rules:
 ✔ Simplified effects on small screens
 
 Test on:
+
 - Android Chrome
 - iPhone Safari
 

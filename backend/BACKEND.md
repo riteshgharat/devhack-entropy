@@ -9,12 +9,12 @@ This backend is designed to:
 ✔ Maintain authoritative state  
 ✔ Enable live leaderboard  
 ✔ Allow optional AI workers later  
-✔ Remain hackathon-buildable in simplified mode  
+✔ Remain hackathon-buildable in simplified mode
 
 For hackathon:
 → Single node deployment  
 → Redis + SQLite optional
-→ AI Worker disabled  
+→ AI Worker disabled
 
 Architecture remains production-ready.
 
@@ -23,17 +23,17 @@ Architecture remains production-ready.
 # 2️⃣ High-Level System Overview
 
 Client (React + TypeScript + KAPLAY)
-        ↓
+↓
 Edge CDN (Static Hosting)
-        ↓
+↓
 WebSocket Gateway (Sticky Sessions)
-        ↓
+↓
 Colyseus Game Cluster
-        ↓
+↓
 Redis (Presence + PubSub + Leaderboard)
-        ↓
+↓
 SQLite (Persistent Data — embedded)
-        ↓
+↓
 AI Worker Layer (Optional - Future)
 
 ---
@@ -41,28 +41,34 @@ AI Worker Layer (Optional - Future)
 # 3️⃣ Tech Stack
 
 ## Core Runtime
+
 - Node.js (LTS)
 - TypeScript
 
 ## Multiplayer Engine
+
 - Colyseus
 
 ## API Service
+
 - Express or Fastify
 
 ## Realtime Infrastructure
+
 - Redis
   - Presence
   - Pub/Sub
   - Sorted Sets (Leaderboard)
 
 ## Database
+
 - SQLite (via better-sqlite3)
   - Match History
   - Embedded — no server required
   - File: `chaos_arena.db`
 
 ## Optional AI Layer (Future)
+
 - BullMQ (Redis-backed queue)
 - AI Provider:
   - Groq (Low latency)
@@ -70,8 +76,9 @@ AI Worker Layer (Optional - Future)
   - OpenRouter
 
 Framework Suggestion for AI Later:
+
 - Lightweight custom wrapper + Zod validation
-Avoid heavy agent frameworks initially.
+  Avoid heavy agent frameworks initially.
 
 ---
 
@@ -80,21 +87,21 @@ Avoid heavy agent frameworks initially.
 chaos-platform/
 
 ├── api/
-│   ├── auth/
-│   ├── users/
-│   └── leaderboard/
+│ ├── auth/
+│ ├── users/
+│ └── leaderboard/
 │
 ├── game-server/
-│   ├── games/
-│   │     ├── arena/
-│   │     ├── runner/
-│   │     └── tiles/
-│   ├── rooms/
-│   ├── matchmaking/
-│   ├── leaderboard/
-│   └── core/
+│ ├── games/
+│ │ ├── arena/
+│ │ ├── runner/
+│ │ └── tiles/
+│ ├── rooms/
+│ ├── matchmaking/
+│ ├── leaderboard/
+│ └── core/
 │
-├── worker/   (AI Layer – future)
+├── worker/ (AI Layer – future)
 │
 └── docker-compose.yml
 
@@ -147,20 +154,21 @@ Server authoritative simulation.
 6️⃣ Server validates and updates state  
 7️⃣ State patches broadcast to clients  
 8️⃣ Match ends  
-9️⃣ Score stored in Redis + SQLite  
+9️⃣ Score stored in Redis + SQLite
 
 ---
 
 # 7️⃣ Real-Time Sync Architecture
 
 ## Transport
+
 - WebSocket (Primary)
 - WebRTC (Optional, future)
 
 ## Tick Strategy
 
 Simulation: 60 FPS  
-Network Sync: 20–30 FPS  
+Network Sync: 20–30 FPS
 
 Colyseus sends:
 ✔ State patches (diff only)
@@ -175,12 +183,13 @@ Flow:
 Player selects game  
 ↓  
 Redis checks:
+
 - Open room exists?
 - Room full?
-↓  
-Join or create room  
-↓  
-Room registered in Redis  
+  ↓  
+  Join or create room  
+  ↓  
+  Room registered in Redis
 
 Redis Used For:
 
@@ -212,7 +221,7 @@ Redis sorted set updated
 ↓  
 Publish leaderboard update  
 ↓  
-Clients auto-refresh ranking  
+Clients auto-refresh ranking
 
 Channel:
 leaderboard_updates_arena
@@ -235,6 +244,7 @@ If new login:
 → invalidate old session
 
 Prevents:
+
 - Multi-tab abuse
 - Ghost players
 - Duplicate sessions
@@ -268,12 +278,12 @@ Ensures player remains on same node.
 ✔ Server authoritative physics  
 ✔ Client-side prediction  
 ✔ Interpolation for other players  
-✔ Reconciliation on mismatch  
+✔ Reconciliation on mismatch
 
 Server:
 
 this.setSimulationInterval(() => {
-   this.updatePhysics();
+this.updatePhysics();
 }, 1000 / 60);
 
 ---
@@ -283,15 +293,15 @@ this.setSimulationInterval(() => {
 Future architecture:
 
 Game Server
-   ↓
+↓
 BullMQ Queue
-   ↓
+↓
 AI Worker
-   ↓
+↓
 LLM Provider
-   ↓
+↓
 Validated Action
-   ↓
+↓
 Back to Game Room
 
 For now:
@@ -308,7 +318,7 @@ Simplified:
 ✔ Single Redis instance  
 ✔ SQLite embedded (no separate DB server)  
 ✔ No horizontal scaling  
-✔ AI disabled  
+✔ AI disabled
 
 Deployment Options:
 
@@ -323,17 +333,17 @@ WebSocket must be supported.
 # 1️⃣5️⃣ Clean Production Diagram
 
 CDN
-  ↓
+↓
 Nginx (Sticky WS)
-  ↓
+↓
 Colyseus Cluster
-  ↓
+↓
 Redis
-  ↓
+↓
 SQLite
 
 Optional:
-  ↓
+↓
 AI Worker Pool
 
 ---
@@ -346,7 +356,7 @@ AI Worker Pool
 ✔ Scalable cluster-ready  
 ✔ Clean session control  
 ✔ Efficient state patching  
-✔ AI-ready architecture  
+✔ AI-ready architecture
 
 ---
 

@@ -25,13 +25,6 @@ import { CommunicationHub } from "./components/CommunicationHub";
 import { gameClient } from "./services/gameClient";
 import { Room } from "colyseus.js";
 import { soundManager } from "./services/soundManager";
-// DISABLED — Sarvam TTS voice commentary commented out
-// import {
-//   VoiceSettings,
-//   loadVoiceSettings,
-//   saveVoiceSettings,
-// } from "./services/voiceCommentary";
-// import { Mic, MicOff } from "lucide-react";
 
 function App() {
   const [showSettings, setShowSettings] = React.useState(false);

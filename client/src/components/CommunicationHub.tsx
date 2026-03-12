@@ -11,7 +11,6 @@ import {
   PhoneOff,
   Users,
 } from "lucide-react";
-import { speakCommentary, VoiceSettings } from "../services/voiceCommentary";
 import { useVoiceChat } from "../services/useVoiceChat";
 
 // ─── Types ────────────────────────────────────────────────
@@ -59,8 +58,6 @@ interface Props {
   room: Room;
   nightMode: boolean;
   mySessionId?: string;
-  /** Voice commentary settings from App-level state */
-  voiceSettings?: VoiceSettings;
 }
 
 // ─── Voice participant row ─────────────────────────────────
@@ -134,7 +131,6 @@ export const CommunicationHub: React.FC<Props> = ({
   room,
   nightMode,
   mySessionId,
-  voiceSettings,
 }) => {
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
@@ -146,11 +142,6 @@ export const CommunicationHub: React.FC<Props> = ({
   const [arenaFlash, setArenaFlash] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const arenaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Keep voiceSettings in a ref so the stable onMessage handler always reads latest value
-  const voiceSettingsRef = useRef(voiceSettings);
-  useEffect(() => {
-    voiceSettingsRef.current = voiceSettings;
-  }, [voiceSettings]);
 
   // ─── Voice Chat ───────────────────────────────────────────
   const {
@@ -176,10 +167,6 @@ export const CommunicationHub: React.FC<Props> = ({
     const handlers = [
       room.onMessage("chat_message", (msg: ChatMsg) => {
         setChat((prev) => [...prev.slice(-49), msg]);
-        // DISABLED — Sarvam TTS commentary commented out
-        // if (msg.playerId === "ai_game_master" && voiceSettingsRef.current) {
-        //   speakCommentary(msg.text, voiceSettingsRef.current);
-        // }
       }),
 
       room.onMessage("emoji_reaction", (event: EmojiEvent) => {
@@ -187,17 +174,13 @@ export const CommunicationHub: React.FC<Props> = ({
       }),
 
       room.onMessage("ai_overlay", (_overlay: any) => {
-        // DISABLED — AI overlay / agentic flow commented out
       }),
 
       room.onMessage(
         "ai_emoji_burst",
         (_data: { emoji: string; target: string }) => {
-          // DISABLED — AI emoji burst commented out
-          // for (let i = 0; i < 5; i++) {
-          //   setTimeout(() => spawnFloatingEmoji(_data.emoji), i * 80);
-          // }
         },
+      ),
       ),
 
       room.onMessage("arena_event", (_event: ArenaEvent) => {

@@ -1,6 +1,8 @@
 # 🎮 CHAOS ARENA
 
-> A real-time multiplayer browser game platform powered by an AI Game Master — with live voice commentary, cross-device WebRTC voice chat, and a global leaderboard.
+> A real-time multiplayer browser game platform with cross-device WebRTC voice chat and a global leaderboard.
+
+![Chaos Arena Main Screen](utils/images/ss1.png)
 
 ---
 
@@ -20,20 +22,20 @@
 
 ## Overview
 
-Chaos Arena is a hackathon-built real-time multiplayer game platform where 2–8 players compete across three arcade-style mini-games. An **AI Game Master** (powered by Google Gemini) watches the action and constantly meddles — spawning hazards, changing physics, spotlighting players, and narrating the chaos via **Sarvam AI live voice commentary** (bilingual EN/HI, dual-host alternation). Players can also talk to each other via **WebRTC peer-to-peer voice chat** relayed through the game server.
+Chaos Arena is a hackathon-built real-time multiplayer game platform where 2–8 players compete across three arcade-style mini-games. Players race to mow glowing grass, pass a ticking dynamite, or score goals. Players can also talk to each other via **WebRTC peer-to-peer voice chat** relayed through the game server.
 
 ---
 
 ## Game Modes
 
 ### 🌿 Grass Collect
-A 60-second collection sprint. Players race to mow glowing grass tiles across an 800×600 arena with momentum-based physics. The AI Game Master periodically triggers arena events (boundary shrink, speed-up, slow-mo, spotlight) to shake up the leaderboard. Highest score at zero seconds wins.
+A 60-second collection sprint. Players race to mow glowing grass tiles across an 800×600 arena with momentum-based physics. Highest score at zero seconds wins.
 
 ### 🧨 Hot Dynamite
-An elimination brawl where a ticking dynamite is forcefully attached to a random player. Move into another player to pass it before it explodes — eliminating the holder instantly. The timer accelerates as players drop. The AI may grease the floor (drift), spawn decoy bombs, or manipulate movement. Last stickman alive wins.
+An elimination brawl where a ticking dynamite is forcefully attached to a random player. Move into another player to pass it before it explodes — eliminating the holder instantly. The timer accelerates as players drop. Last stickman alive wins.
 
 ### ⚽ Turf Soccer
-A chaotic 2-team soccer match. Players battle for ball control and goals in a physics-driven pitch. The AI shifts momentum, spotlights key players, and creates dramatic moments. First team to the point threshold wins.
+A chaotic 2-team soccer match. Players battle for ball control and goals in a physics-driven pitch. First team to the point threshold wins.
 
 ---
 
@@ -220,11 +222,27 @@ devhack-entropy/
 
 ### Prerequisites
 
-- Node.js 20+
-- Redis (or Docker: `docker run -p 6379:6379 redis`)
-- API keys: `GEMINI_API_KEY`, `SARVAM_API_KEY`
+- Docker and Docker Compose
 
-### Backend
+### Setup with Docker
+
+1. **Configure Environment Variables**
+   - Copy `backend/.env.example` to `backend/.env` and add your API keys.
+   - (Optional) Copy `client/.env.example` to `client/.env` if you need to customize the backend URL.
+
+2. **Run with Docker Compose**
+   ```bash
+   docker-compose up --build
+   ```
+
+   The application will be available at:
+   - **Frontend:** http://localhost:5173
+   - **Backend:** http://localhost:3000
+   - **Redis:** localhost:6379
+
+### Manual Setup (Development)
+
+#### Backend
 
 ```bash
 cd backend

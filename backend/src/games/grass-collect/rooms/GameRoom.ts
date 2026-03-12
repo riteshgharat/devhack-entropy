@@ -1,5 +1,4 @@
 import { Room, Client, matchMaker } from "colyseus";
-import { RoomComms } from "../../../ai/roomComms";
 import { GameState } from "../schemas/GameState";
 import { PlayerState } from "../schemas/PlayerState";
 import { ItemState } from "../schemas/GrassState";
@@ -47,7 +46,6 @@ export class GameRoom extends Room<GameState> {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private resetTimeout: ReturnType<typeof setTimeout> | null = null;
   private playerCutTimers: Map<string, Map<string, number>> = new Map();
-  private comms!: RoomComms;
 
   // ───── Room lifecycle ────────────────────────────────────
 
@@ -113,9 +111,6 @@ export class GameRoom extends Room<GameState> {
       this.update(deltaTime);
     }, 1000 / TICK_RATE);
 
-    // AI Game-Master & communication hub
-    this.comms = new RoomComms(this, "grass");
-
     console.log(`🏟️  GameRoom created | Room ID: ${this.roomId}`);
   }
 
@@ -170,7 +165,6 @@ export class GameRoom extends Room<GameState> {
     const player = this.state.players.get(client.sessionId);
     if (!player) return;
 
-    this.comms.onClientLeave(client.sessionId);
     console.log(`❌ ${player.displayName} left | Session: ${client.sessionId}`);
 
     this.state.players.delete(client.sessionId);
@@ -224,11 +218,6 @@ export class GameRoom extends Room<GameState> {
 
   private update(deltaTime: number) {
     const dt = deltaTime / 1000; // ms → seconds
-
-    // AI Game-Master tick
-    if (this.state.matchStarted && !this.state.matchEnded) {
-      this.comms.tick(deltaTime);
-    }
 
     if (!this.state.matchStarted || this.state.matchEnded) return;
 
@@ -299,12 +288,6 @@ export class GameRoom extends Room<GameState> {
 
             if (this.state.grid[idx] === 0) {
               player.score += 10;
-
-              if (player.score % 50 === 0 && player.score > 0) {
-                this.comms.addEvent(
-                  `${player.displayName} hits ${player.score} points!`,
-                );
-              }
             }
           }
         }
@@ -322,9 +305,6 @@ export class GameRoom extends Room<GameState> {
 
           if (item.type === "booster") {
             player.speedMultiplier = SPEED_BOOST_MULTIPLIER;
-            this.comms.addEvent(
-              `⚡ ${player.displayName} grabbed speed boost!`,
-            );
             this.broadcast("booster_collected", {
               x: item.x,
               y: item.y,
@@ -343,9 +323,6 @@ export class GameRoom extends Room<GameState> {
                 p.stunTimer = ROCKET_STUN_DURATION;
               }
             });
-            this.comms.addEvent(
-              `🚀 ${player.displayName} launched a ROCKET!`,
-            );
             this.broadcast("rocket_launched", {
               x: item.x,
               y: item.y,
@@ -399,9 +376,6 @@ export class GameRoom extends Room<GameState> {
           victimId: sessionId,
           victimName: player.displayName,
         });
-        this.comms.addEvent(
-          `💣 ${player.displayName} uncovered a bomb! Stunned!`,
-        );
       } else {
         // Booster or Rocket — pop out of the grass, must be collected separately
         item.revealed = true;

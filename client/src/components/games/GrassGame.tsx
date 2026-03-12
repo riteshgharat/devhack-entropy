@@ -996,6 +996,31 @@ export const GrassGame: React.FC<GrassGameProps> = ({
         </div>
       </div>
 
+      {/* Power-up Event Banners (above game) */}
+      <div className="w-full flex justify-center mb-2 min-h-10 pointer-events-none">
+        <AnimatePresence>
+          {eventBanners.map((b) => (
+            <motion.div
+              key={b.id}
+              initial={{ y: -30, opacity: 0, scale: 0.8 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -20, opacity: 0, scale: 0.8 }}
+              transition={{ type: "spring", damping: 15 }}
+              className="px-4 py-2 rounded-lg font-display text-sm text-white whitespace-nowrap mx-1"
+              style={{
+                backgroundColor: `${b.color}dd`,
+                boxShadow: `0 0 16px ${b.color}88, 0 4px 12px rgba(0,0,0,0.4)`,
+                border: `2px solid ${b.color}`,
+                textShadow: "1px 1px 2px rgba(0,0,0,0.6)",
+              }}
+            >
+              <span className="mr-2 text-lg">{b.icon}</span>
+              {b.text}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       <div className="flex flex-col md:flex-row gap-4 w-full">
         {/* Game Canvas Container */}
         <div
@@ -1058,30 +1083,6 @@ export const GrassGame: React.FC<GrassGameProps> = ({
             )}
           </AnimatePresence>
 
-          {/* Power-up Event Banners */}
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none">
-            <AnimatePresence>
-              {eventBanners.map((b) => (
-                <motion.div
-                  key={b.id}
-                  initial={{ y: -30, opacity: 0, scale: 0.8 }}
-                  animate={{ y: 0, opacity: 1, scale: 1 }}
-                  exit={{ y: -20, opacity: 0, scale: 0.8 }}
-                  transition={{ type: "spring", damping: 15 }}
-                  className="px-4 py-2 rounded-lg font-display text-sm text-white whitespace-nowrap"
-                  style={{
-                    backgroundColor: `${b.color}dd`,
-                    boxShadow: `0 0 16px ${b.color}88, 0 4px 12px rgba(0,0,0,0.4)`,
-                    border: `2px solid ${b.color}`,
-                    textShadow: "1px 1px 2px rgba(0,0,0,0.6)",
-                  }}
-                >
-                  <span className="mr-2 text-lg">{b.icon}</span>
-                  {b.text}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
 
         </div>
 

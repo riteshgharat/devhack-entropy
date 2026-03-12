@@ -1,5 +1,4 @@
 import { Room, Client } from "colyseus";
-import { RoomComms } from "../../../ai/roomComms";
 import {
   TurfSoccerState,
   PlayerState,
@@ -45,7 +44,6 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
   private _emptyRoomTimeout?: NodeJS.Timeout;
   private ballBorderTimer: number = 0;
   private botIdCounter: number = 0;
-  private comms!: RoomComms;
 
   onCreate(options: any) {
     this.maxClients = MAX_PLAYERS;
@@ -99,9 +97,6 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
       TIME_STEP,
     );
 
-    // AI Game-Master & communication hub
-    this.comms = new RoomComms(this, "turf_soccer");
-
     console.log(`⚽ Turf Soccer Room created: ${this.roomId}`);
   }
 
@@ -142,7 +137,6 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
   onLeave(client: Client) {
     const player = this.state.players.get(client.sessionId);
     if (player) console.log(`⚽ ${player.displayName} left`);
-    this.comms.onClientLeave(client.sessionId);
     this.state.players.delete(client.sessionId);
 
     if (this.getHumanCount() < MIN_PLAYERS) {
@@ -355,33 +349,11 @@ export class TurfSoccerRoom extends Room<TurfSoccerState> {
     console.log(
       `⚽ GOAL! Team ${teamId} scores. ${this.state.scoreTeam1} - ${this.state.scoreTeam2}`,
     );
-
-    const scoreDiff = Math.abs(this.state.scoreTeam1 - this.state.scoreTeam2);
-    if (scoreDiff === 0) {
-      this.comms.addEvent(
-        `TIED GAME! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`,
-      );
-    } else if (scoreDiff >= 2) {
-      const leadingTeam =
-        this.state.scoreTeam1 > this.state.scoreTeam2 ? "Red" : "Blue";
-      this.comms.addEvent(
-        `${leadingTeam} Team dominating ${this.state.scoreTeam1}-${this.state.scoreTeam2}!`,
-      );
-    } else {
-      this.comms.addEvent(
-        `Team ${teamId} SCORES! ${this.state.scoreTeam1}-${this.state.scoreTeam2}`,
-      );
-    }
   }
 
   // ─── Physics / Simulation ─────────────────────────────
 
   private update(deltaTime: number) {
-    // AI Game-Master tick
-    if (this.state.matchStarted && !this.state.matchEnded) {
-      this.comms.tick(deltaTime);
-    }
-
     if (!this.state.matchStarted || this.state.matchEnded) return;
     const dt = deltaTime / 1000;
 
